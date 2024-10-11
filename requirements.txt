@@ -3,4 +3,6 @@ pillow
 pandas
 plotly
 numpy
-
+python-docx
+mathml2omml
+latex2mathml

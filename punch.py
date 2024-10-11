@@ -1,29 +1,71 @@
-##from turtle import width
+
 import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
+from decimal import Decimal
+
+import docx
+from docx import Document
+from docx.shared import Pt
+from docx.shared import Mm
+from docx.shared import RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import math2docx
+import io
+
 ##pile_punch_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 ##+ '/pages/pile_punch/')
 ##sys.path.append(pile_punch_dir)
-st.header('Расчет на продавливание фундаментной плиты, опирающейся на сваи')
+
+
+
+
+import typing
+import mathml2omml
+import latex2mathml.converter
+from docx.oxml import parse_xml
+
+def my_formula(latex_string: str) -> typing.Any:
+    mathml_output = latex2mathml.converter.convert(latex_string)
+    omml_output = mathml2omml.convert(mathml_output)
+    xml_output = (
+        f'<p xmlns:m="http://schemas.openxmlformats.org/officeDocument'
+        f'/2006/math">{omml_output}</p>'
+    )
+    return parse_xml(xml_output)[0]
+
+def delete_paragraph(paragraph):
+    p = paragraph._element
+    p.getparent().remove(p)
+    paragraph._p = paragraph._element = None
+
+##st.write(my_formula('11'))
+
+
+table_concretes_data = pd.read_excel('RC_data.xlsx', sheet_name="Concretes_SP63", header=[0])
+available_concretes = table_concretes_data['Class'].to_list()
+
+st.header('Расчет на продавливание плиты')
 
 
 center = [25.0, 50.0]
-centerM = [25.0, 50.0]
 
 
-def find_contour_geometry (V, M, Rbt, h0, F, Mx, My, deltaM, xcol, ycol):
+
+def find_contour_geometry (V, M, Rbt, h0, F, Mx, My, deltaMx,  deltaMy, xcol, ycol):
     #V - массив координат линий контура [   [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
     #M - вектор масс линий
     #Объявляем нулевыми суммарные длину и моменты инерции
     V = np.array(V)
     M = np.array(M)
+    Sx_arr, Sy_arr = [], []
+    Ix_arr, Iy_arr = [], []
+    Ix0_arr, Iy0_arr = [], []
     #print(V1)
     Lsum, Sx, Sy, Ix, Iy = 0, 0, 0, 0, 0
-    LsumM, SxM, SyM, IxM, IyM = 0, 0, 0, 0, 0
     Fult = 0
     #Присваеваем максимум и минимум координат
     #в соответствии с координатами первой точки первой линии
@@ -37,32 +79,30 @@ def find_contour_geometry (V, M, Rbt, h0, F, Mx, My, deltaM, xcol, ycol):
         #Вычисляем длину i-го участка
         L_i = ((x1 - x2)**2 + (y1 - y2)**2)**0.5
         #Добавляем его длину в суммарную
-        Lsum, LsumM = Lsum + L_i, LsumM + L_i*M[j]
+        Lsum = Lsum + L_i
         #Вычисляем координаты центра i-го участка
         center_i = ((x2 - x1)/2 + x1, (y2 - y1)/2 + y1)
         #Вычисляем статические моменты i-го участка
         Sx_i = L_i*center_i[0]
+        Sx_arr.append(Sx_i)
         Sy_i = L_i*center_i[1]
+        Sy_arr.append(Sy_i)
         #Добавляем их в суммарные
-        Sx, SxM = Sx + Sx_i, SxM + Sx_i*M[j]
-        Sy, SyM = Sy + Sy_i, SyM + Sy_i*M[j]
+        Sx = Sx + Sx_i
+        Sy = Sy + Sy_i
         j += 1
-    #Длина контура и весовая длина контура
-    Lsum, LsumM = round(Lsum, 2), round(LsumM,2)
     #Предельная сила, воспринимаемая бетоном
-    Fbult = LsumM*Rbt*h0
+    Fbult = Lsum*Rbt*h0
     #Коэффициент использования по продольной силе
     kF= F/Fbult
     #Вычисляем координаты центра тяжести всего контура
-    xc, xcM = Sx/Lsum, SxM/LsumM
-    yc, ycM = Sy/Lsum, SyM/LsumM
-    ex, exM = xc - xcol, xcM - xcol
-    ey, eyM = yc - ycol, ycM - ycol
+    xc, yc = Sx/Lsum, Sy/Lsum
+    ex, ey = xc - xcol, yc - ycol
     #Расчет характеристик "без масс"
     for i in V:
         #Вычисляем координаты минимума и максимума относительно геометрического центра тяжести
-        xmin, xmax = xmin0 - xc, xmax0 - xc
-        ymin, ymax = ymin0 - yc, ymax0 - yc
+        xL, xR = xmin0 - xc, xmax0 - xc
+        yB, yT = ymin0 - yc, ymax0 - yc
         #Извлекаем координаты начала и конца i-го участка
         #и пересчитываем их относительно центра тяжести
         x1, x2 = i[0] - xc
@@ -78,42 +118,43 @@ def find_contour_geometry (V, M, Rbt, h0, F, Mx, My, deltaM, xcol, ycol):
         #Собственные моменты инерции
         Ix0_i = Lx_i**3/12
         Iy0_i = Ly_i**3/12
+        Ix0_arr.append(Ix0_i)
+        Iy0_arr.append(Iy0_i)
         #Моменты инерции относительно центра тяжести
         Ix_i = Ix0_i + L_i*x0**2
         Iy_i = Iy0_i + L_i*y0**2
+        Ix_arr.append(Ix_i)
+        Iy_arr.append(Iy_i)
         Ix = Ix + Ix_i
         Iy = Iy + Iy_i
-    Wxl, Wxr = Ix/abs(xmin), Ix/xmax
+    Wxl, Wxr = Ix/abs(xL), Ix/xR
     Wxmin = min(Wxl, Wxr)
-    Wyb, Wyt = Iy/abs(ymin), Iy/ymax
+    Wyb, Wyt = Iy/abs(yB), Iy/yT
     Wymin = min(Wyb, Wyt)
-    Mbxult = Wxmin*h0*Rbt*M.min()/100
-    Mbyult = Wymin*h0*Rbt*M.min()/100
+    Mbxult = Wxmin*h0*Rbt/100
+    Mbyult = Wymin*h0*Rbt/100
     Mxexc = -F*ex/100
     Myexc = -F*ey/100
-    MxexcM = -F*exM/100
-    MyexcM = -F*eyM/100
     Mxloc = Mx + Mxexc
     Myloc = My + Myexc
-    MxlocM = Mx + MxexcM
-    MylocM = My + MyexcM
-    Mxlocmax = max(abs(Mxloc), abs(MxlocM))
-    Mylocmax = max(abs(Myloc), abs(MylocM))
-    kM = (abs(Mxloc)/Mbxult + abs(Myloc)/Mbyult)*deltaM
-    kMM = (abs(MxlocM)/Mbxult + abs(MylocM)/Mbyult)*deltaM
+    kM = (abs(Mxloc)/Mbxult*deltaMx + abs(Myloc)/Mbyult)*deltaMy
     kM = min(kM, kF/2)
-    kMM = min(kMM, kF/2)
-    kMmax = max(kM, kMM) 
-    k = kF + max(kM, kMM) 
-    return {'Lsum': Lsum, 'xc': xc, 'yc': yc, 'xcM': xcM, 'ycM': ycM, 
-                                     'ex': ex, 'ey': ey, 'exM': exM, 'eyM': eyM,
-                                     'Ibx': Ix, 'Iby': Iy, 'xmin': xmin, 'xmax': xmax, 'ymin': ymin, 'ymax': ymax,
-                                     'Wxmin': Wxmin, 'Wymin': Wymin,
-                                     'Mxexc': Mxexc, 'Myexc': Myexc, 'MxexcM': MxexcM, 'MyexcM': MyexcM,
-                                     'Mxloc': Mxloc, 'Myloc': Myloc, 'MxlocM': MxlocM, 'MylocM': MylocM, 
-                                     'Mxlocmax': Mxlocmax, 'Mylocmax': Mylocmax,
-                                     'Fbult': Fbult, 'Mbxult': Mbxult, 'Mbyult': Mbyult,
-                                     'kF': kF, 'kM': kM, 'kMM': kMM, 'kMmax': kMmax , 'k': k}
+    k = kF + kM 
+    xmax = max(abs(xL),xR)
+    ymax = max(abs(yB),yT)
+    return {'Lsum': Lsum, 'xc': xc, 'yc': yc, 'ex': ex, 'ey': ey,
+            'xL': xL, 'xR': xR, 'yB': yB, 'yT': yT,
+            'xmax': xmax, 'ymax': ymax,
+            'Ix': Ix, 'Iy': Iy, 
+            'Sx_arr': Sx_arr, 'Sy_arr': Sy_arr,
+            'Ix0_arr': Ix0_arr, 'Iy0_arr': Iy0_arr,
+            'Ix_arr': Ix_arr, 'Iy_arr': Iy_arr,
+            'Sx': Sx, 'Sy': Sy,
+            'Wxmin': Wxmin, 'Wymin': Wymin,
+            'Mxexc': Mxexc, 'Myexc': Myexc,
+            'Mxloc': Mxloc, 'Myloc': Myloc,
+            'Fbult': Fbult, 'Mbxult': Mbxult, 'Mbyult': Mbyult,
+            'kF': kF, 'kM': kM, 'k': k}
 
 def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
     contour = []
@@ -125,6 +166,7 @@ def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT
     contour_colour = []
     contour_sides = []
     contour_len = []
+    contour_len_pr = []
     contour_center = []
     if is_cL:
         contour_x = [-cL0/2, -cL0/2]
@@ -139,6 +181,7 @@ def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT
         contour_xc = contour_x[0]
         contour_yc = contour_y[0] + 0.5*L
         contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
     if is_cR:
         contour_x = [b+cR0/2, b+cR0/2]
         contour_y = [-cB0/2, h+cT0/2]
@@ -152,6 +195,7 @@ def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT
         contour_xc = contour_x[0]
         contour_yc = contour_y[0] + 0.5*L
         contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
     if is_cB:
         contour_x = [-cL0/2, b+cR0/2]
         contour_y = [-cB0/2, -cB0/2]
@@ -165,6 +209,7 @@ def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT
         contour_yc = contour_y[0]
         contour_xc = contour_x[0] + 0.5*L
         contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
     if is_cT:
         contour_x = [-cL0/2, b+cR0/2]
         contour_y = [h+cT0/2, h+cT0/2]
@@ -178,7 +223,9 @@ def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT
         contour_yc = contour_y[0]
         contour_xc = contour_x[0] + 0.5*L
         contour_center.append([contour_xc, contour_yc])
-    return contour, contour_gamma, contour_sides, contour_len, contour_center
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
+        
+    return contour, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr
 
 def generate_red_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
     add = 0.75*h0
@@ -186,27 +233,41 @@ def generate_red_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
     if not is_cL:
         contour_x = [-cL, -cL]
         contour_y = [-add, h+add]
+        if not is_cB:
+            contour_y[0] = -cB
+        if not is_cT:
+            contour_y[1] = h+cT
         contour.append([contour_x, contour_y])
     if not is_cR:
         contour_x = [b+cR, b+cR]
         contour_y = [-add, h+add]
+        if not is_cB:
+            contour_y[0] = -cB
+        if not is_cT:
+            contour_y[1] = h+cT
         contour.append([contour_x, contour_y])
     if not is_cB:
         contour_x = [-add, b+add]
         contour_y = [-cB, -cB]
+        if not is_cL:
+            contour_x[0] = -cL
+        if not is_cR:
+            contour_x[1] = b+cR
         contour.append([contour_x, contour_y])
     if not is_cT:
         contour_x = [-add, b+add]
         contour_y = [h+cT, h+cT]
+        if not is_cL:
+            contour_x[0] = -cL
+        if not is_cR:
+            contour_x[1] = b+cR
         contour.append([contour_x, contour_y])
     return contour
     
 def draw_scheme(b, h, h0,
                 cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
-                red_contours, blue_contours, center, centerM):
+                red_contours, blue_contours, center):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[center[0]], y=[center[1]], showlegend=False, mode="markers", marker_symbol=4, marker_size=10, line=dict(color='green')))
-    fig.add_trace(go.Scatter(x=[centerM[0]], y=[centerM[1]], showlegend=False, mode="markers", marker_symbol=4, marker_size=10, line=dict(color='red')))
     #Добавляем колонну
     xx = [0, b, b, 0, 0]
     yy = [0, 0, h, h, 0]
@@ -291,22 +352,25 @@ def draw_scheme(b, h, h0,
         if cT>0:
             fig.add_annotation(x=b, ax=b, y=h, ay=h+cT, **arrows_props)
             fig.add_annotation(x=b, ax=b, y=h+cT, ay=h, **arrows_props)
-##            fig.add_annotation(x=b, y=h, ax=0, ay=-k_l*cT, **arrows_props)
-##            fig.add_annotation(x=b, y=h+cT, ax=0, ay=k_l*cT, **arrows_props)
             fig.add_annotation(dict(x=b, y=h+cT/2, text=f'{float(cT):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
+    fig.add_trace(go.Scatter(x=[center[0]], y=[center[1]], showlegend=False, mode="markers", marker_symbol=4, marker_size=15, line=dict(color='green')))
     fig.update_yaxes(scaleanchor="x",scaleratio=1,title="y")
     fig.update_xaxes(dict(title="x", visible=False))
     fig.update_yaxes(visible=False)
-    fig.update_layout(autosize=True, margin={'l': 0, 'r': 0, 't': 0, 'b': 0})
-    return fig
+    #autosize=True,
+    fig.update_layout(margin={'l': 0, 'r': 0, 't': 0, 'b': 0})
+    fig.update_layout(height=400, width=400)
+    file_stream = io.BytesIO()
+    fig.write_image(file_stream, format='png', width=400, height=400, scale=8)
+    return fig, file_stream
 
 
 
 with st.expander('Описание исходных данных'):
     st.write(''' $b$ и $h$ - ширина и высота поперечного сечения сечения колонны, см; ''')
-    st.write(''' $h_0$ - рабочая высота поперечного сечения фундаментной плиты, см; ''')
-    st.write(''' $c_L$ и $c_R$ - расстояние в свету до левой и правой сваи (грани плиты) от грани колонны, см; ''')
-    st.write(''' $c_B$ и $c_T$ - расстояние в свету до нижней и верхней сваи (грани плиты) от грани колонны, см; ''')
+    st.write(''' $h_0$ - рабочая высота поперечного сечения плиты, см; ''')
+    st.write(''' $c_L$ и $c_R$ - расстояние в свету до левой и правой грани плиты от грани колонны, см; ''')
+    st.write(''' $c_B$ и $c_T$ - расстояние в свету до нижней и верхней грани плиты от грани колонны, см; ''')
     st.write(''' $R_{bt}$ - расчетное сопротивление на растяжение материала фундаментной плиты, МПа; ''')
     st.write(''' $F$ - продавливающее усилие, тс; ''')
     st.write(''' $M_x$ - сосредоточенные момент в ПЛОСКОСТИ оси $x$ (относительно оси $y$), тсм; ''')
@@ -356,31 +420,49 @@ is_cT = cols2[2].toggle('Контур_сверху', value=True, label_visibilit
 cT = cols2[1].number_input(label='$c_T$, см', step=5.0, format="%.1f", value=10.0, disabled=is_cT, min_value=0.0, max_value=500.0, label_visibility="collapsed")
 
 ##cols3 = st.columns([1, 0.5])
-cols2 = st.columns([1,1,1,1,1])
-Rbt = cols2[0].number_input(label='$R_{bt}$, МПа', step=0.05, format="%.2f", value=1.4, min_value=0.1, max_value=5.0, label_visibility="visible")
-#Rbt = 0.01019716213*Rbt
-Rbt = 0.01*Rbt
-F = cols2[1].number_input(label='$F$, тс', step=0.5, format="%.1f", value=1400.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
-Mx = cols2[2].number_input(label='$M_x$, тсм', step=0.5, format="%.1f", value=90.0, label_visibility="visible")
-My = cols2[3].number_input(label='$M_y$, тсм', step=0.5, format="%.1f", value=120.0, label_visibility="visible")
-deltaM = cols2[4].number_input(label='$\delta_M$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
+cols2 = st.columns([1,0.8,0.8,0.8,0.8,0.8,0.7,0.7])
+ctype = cols2[0].selectbox(label='Бетон', options=available_concretes, index=5, label_visibility="visible")
+selected_concrete_data = table_concretes_data.loc[table_concretes_data['Class'] == ctype]
+selected_concrete_data = selected_concrete_data.to_dict('records')[0]
+Rbt0 = selected_concrete_data['Rbt']
+gammabt = cols2[1].number_input(label='$\\gamma_{bt}$', step=0.05, format="%.2f", value=1.0, min_value=0.1, max_value=1.0, label_visibility="visible")
+Rbt01 = Rbt0*gammabt
+RbtMPA = cols2[2].number_input(label='$R_{bt}$, МПа', step=0.05, format="%.2f", value=Rbt01, min_value=0.1, max_value=2.2, label_visibility="visible", disabled=True)
+Rbt = 0.01019716213*RbtMPA
+st.write(Rbt)
+#Rbt = 0.01*Rbt
+F = cols2[3].number_input(label='$F$, тс', step=0.5, format="%.1f", value=28.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
+Mx = cols2[4].number_input(label='$M_x$, тсм', step=0.5, format="%.1f", value=4.0, label_visibility="visible")
+My = cols2[5].number_input(label='$M_y$, тсм', step=0.5, format="%.1f", value=7.0, label_visibility="visible")
+deltaMx = cols2[6].number_input(label='$\delta_{Mx}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
+deltaMy = cols2[7].number_input(label='$\delta_{My}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
+
+is_sw = st.toggle('Поперечное армирование', value=False)
+cols2 = st.columns([1,1,1,1,1,1,1])
+
+
+Rsw = cols2[1].number_input(label='$R_{sw}$, МПа', step=0.05, format="%.2f", value=170.0, min_value=0.1, max_value=300.0, label_visibility="visible")
+Rsw = 0.01019716213*Rsw
+nsw = cols2[2].number_input(label='$n_{sw}$, шт.', step=1, format="%i", value=2, min_value=1, max_value=10, label_visibility="visible")
+dsw = cols2[3].selectbox(label='$d_{sw}$, мм', options=[6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 32], index=0, label_visibility="visible")
+sw = cols2[4].number_input(label='$s_w$, см', step=5.0, format="%.2f", value=6.0, min_value=0.0, max_value=100.0, label_visibility="visible")
 
 
 
 
 red_contours = generate_red_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
-blue_contours, contour_gamma, contour_sides, contour_len, contour_center = generate_blue_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+blue_contours, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr = generate_blue_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
 num_elem = len(blue_contours)
 rez = 0
 if num_elem>=2:
-    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, h0, F, Mx, My, deltaM, b/2, h/2)
+    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, h0, F, Mx, My, deltaMx, deltaMy, b/2, h/2)
     center = [rez['xc'], rez['yc']]
-    centerM = [rez['xcM'], rez['ycM']]
     #st.write(rez)
 
-fig = draw_scheme(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
-                  red_contours, blue_contours, center, centerM)
-cols[0].plotly_chart(fig, use_container_width=True)
+fig, image_stream = draw_scheme(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
+                  red_contours, blue_contours, center)
+#, use_container_width=True
+cols[0].plotly_chart(fig)
 
 if num_elem<2:
     st.write('В расчете должно быть минимум два участка!')
@@ -389,25 +471,489 @@ if num_elem<2:
 
 
 with st.expander('Расчетные выкладки'):
-
-    LL, LR, LT, LB = 0, 0, 0, 0
-    string = 'Длины участков контура приведены в таблице ниже:'
-    contours_lens = {'Li, см':[]}
-    contours_lens_names = []
-    for i in range(len(contour_sides)):
-        contours_lens_names.append(contour_sides[i])
-        contours_lens['Li, см'].append(contour_len[i])
-    string = string[:-2]
-    string += '.'
-    st.write(string)
-    contours_lens = pd.DataFrame.from_dict(contours_lens, orient='index', columns=contours_lens_names)
-    st.write(contours_lens)
+    doc = Document('Template_punch.docx')
+    doc.core_properties.author = 'Автор'
+    p = doc.paragraphs[-1]
+    delete_paragraph(p)
     
-    st.write('Предельную продавливаюшую силу, воспринимаемую бетоном, вычисляем по формуле:')
+    doc.add_heading('Расчет на продавливание при действии сосредоточенной силы и изгибающих моментов', level=0)
+    string = '''Расчет производится согласно СП 63.13330.2018 п. 8.1.46 - 8.1.52.'''
+    doc.add_paragraph().add_run(string)
+    string = 'Геометрические характеристики, такие как статические моменты, осевые моменты инерции, моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
+    if is_sw:
+        string += ' Поперечная арматура принимается равномерно расположенной по периметру расчетного контура.'
+    st.write(string)
+    doc.add_paragraph().add_run(string)
+    doc.add_picture(image_stream, width=Mm(80))
+    p = doc.paragraphs[-1]
+    p.paragraph_format.first_line_indent = Mm(0)
+    p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    st.latex('''
-    F_{b,ult} = R_{bt} \\cdot h_0 \\cdot \\sum_i L_i .
-    ''')
+
+    if True: #Длины участков
+        string = 'Длины участков расчетного контура, а также длины их проекций в соответствии с эскизом приведены в таблице ниже.'
+
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+    
+        contours_lens = {'Li, см':[], 'Lxi, см':[], 'Lyi, см':[]}
+        contours_lens_names = []
+        for i in range(len(contour_len)):
+            contours_lens_names.append(contour_sides[i])
+            contours_lens['Li, см'].append(f'{float(round(contour_len[i],3)):g}')
+            contours_lens['Lxi, см'].append(f'{float(round(contour_len_pr[i][0],3)):g}')
+            contours_lens['Lyi, см'].append(f'{float(round(contour_len_pr[i][1],3)):g}')
+        contours_lens = pd.DataFrame.from_dict(contours_lens, orient='index', columns=contours_lens_names)
+        st.dataframe(contours_lens, use_container_width=True)
+
+        table = doc.add_table(contours_lens.shape[0]+1, contours_lens.shape[1]+1)
+        table.style = 'Стиль_таблицы'
+        for j in range(contours_lens.shape[-1]):
+            table.cell(0,j+1).text = contours_lens.columns[j]
+            table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        for i in range(contours_lens.shape[0]):
+            for j in range(contours_lens.shape[-1]):
+                table.cell(i+1,j+1).text = str(contours_lens.values[i,j])
+                table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        table.cell(0,0).text = 'Участок'
+        table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(1,0).paragraphs[0]
+        math2docx.add_math(p, 'L_i, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(2,0).paragraphs[0]
+        math2docx.add_math(p, 'L_{x,i}, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(3,0).paragraphs[0]
+        math2docx.add_math(p, 'L_{y,i}, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        
+    if True: #Периметр расчетного контура
+        string = 'Вычисляем периметр расчетного контура:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+
+        string = '$u = \\sum_i L_i = '
+        string += f'{float(round(contour_len[0],3)):g}'
+        for i in range(1, len(contour_len)):
+            string += '+'
+            string += f'{float(round(contour_len[i],3)):g}'
+        string += f'={float(round(sum(contour_len),3)):g} \\cdot см.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+    
+    if True: #Предельная продавливающая сила
+        string = 'Предельную продавливаюшую силу, воспринимаемую бетоном, вычисляем по формуле (8.88) с учетом формулы (8.89):'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$F_{b,ult} = R_{bt} \\cdot h_0 \\cdot u = '
+        string += f'{float(round(Rbt,6)):g} \\cdot {float(round(h0,5)):g} \\cdot  {float(sum(contour_len)):g} ='
+        string += f'{float(round(rez["Fbult"],1)):g} \\cdot тс.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = 'Предельно допустимое значение продавливающей силы (с учетом положений п. 8.1.46), при которой допускается не учитывать изгибающием моменты:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$F_{b,ult}/1.5 = '
+        string += f'{float(round(rez["Fbult"]/1.5,1)):g} \\cdot тс.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+    if True: #Центры тяжести участков
+        string = 'Положения центров тяжести каждого из участков расчетного контура относительно левого нижнего угла колонны приведены в таблице ниже.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        contours_cent = {'xc0i, см':[], 'yc0i, см':[]}
+        contours_cent_names = []
+        for i in range(len(contour_sides)):
+            contours_cent_names.append(contour_sides[i])
+            contours_cent['xc0i, см'].append(f'{float(round(contour_center[i][0],3)):g}')
+            contours_cent['yc0i, см'].append(f'{float(round(contour_center[i][1],3)):g}')
+        contours_cent = pd.DataFrame.from_dict(contours_cent, orient='index', columns=contours_cent_names)
+        st.dataframe(contours_cent, use_container_width=True)
+        table = doc.add_table(contours_cent.shape[0]+1, contours_cent.shape[1]+1)
+        table.style = 'Стиль_таблицы'
+        for j in range(contours_cent.shape[-1]):
+            table.cell(0,j+1).text = contours_cent.columns[j]
+            table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        for i in range(contours_cent.shape[0]):
+            for j in range(contours_cent.shape[-1]):
+                table.cell(i+1,j+1).text = str(contours_cent.values[i,j])
+                table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        table.cell(0,0).text = 'Участок'
+        table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(1,0).paragraphs[0]
+        math2docx.add_math(p, 'x_{c,0,i}, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(2,0).paragraphs[0]
+        math2docx.add_math(p, 'y_{c,0,i}, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+
+    if True: #Статические моменты инерции
+        string = 'Статические моменты инерции каждого из участков расчетного контура относительно левого нижнего угла колонны вычисляются по формулам:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$S_{x,0,i} = L_{i} \\cdot x_{c,0,i} ; \\quad S_{y,0,i} = L_{i} \\cdot y_{c,0,i}.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+        string = 'Результаты расчета статических моментов участков расчетного контура по указанным выше приведены в таблице ниже.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        contours_S = {'Sx0i, см2':[], 'Sy0i, см2':[]}
+        contours_S_names = []
+        for i in range(len(contour_sides)):
+            contours_S_names.append(contour_sides[i])
+            contours_S['Sx0i, см2'].append(f'{float(round(rez["Sx_arr"][i],1)):g}')
+            contours_S['Sy0i, см2'].append(f'{float(round(rez["Sy_arr"][i],1)):g}')
+        contours_S = pd.DataFrame.from_dict(contours_S, orient='index', columns=contours_S_names)
+        st.dataframe(contours_S, use_container_width=True)
+        table = doc.add_table(contours_S.shape[0]+1, contours_S.shape[1]+1)
+        table.style = 'Стиль_таблицы'
+        for j in range(contours_S.shape[-1]):
+            table.cell(0,j+1).text = contours_S.columns[j]
+            table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        for i in range(contours_S.shape[0]):
+            for j in range(contours_S.shape[-1]):
+                table.cell(i+1,j+1).text = str(contours_S.values[i,j])
+                table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        table.cell(0,0).text = 'Участок'
+        table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(1,0).paragraphs[0]
+        math2docx.add_math(p, 'S_{x,0,i}, см^2')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p = table.cell(2,0).paragraphs[0]
+        math2docx.add_math(p, 'S_{y,0,i}, см^2')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    if True: #Статический момент инерции всего сечения
+        string = 'Статические моменты инерции всего расчетного контура относительно левого нижнего угла колонны вычисляем как сумму статических моментов инерции каждого из участков.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$ S_{x,0} = \\sum_i S_{x,0,i}= '
+        string += f'{float(round(rez["Sx_arr"][0],2)):g}'
+        for i in range(1, len(rez["Sx_arr"])):
+            if rez["Sx_arr"][i] > 0:
+                string += '+'
+            string += f'{float(round(rez["Sx_arr"][i],2)):g}'
+        string += f'={float(round(rez["Sx"],2)):g} \\cdot см^2.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = '$ S_{y,0} = \\sum_i S_{y,0,i}= '
+        string += f'{float(round(rez["Sy_arr"][0],2)):g}'
+        for i in range(1, len(rez["Sy_arr"])):
+            if rez["Sy_arr"][i] > 0:
+                string += '+'
+            string += f'{float(round(rez["Sy_arr"][i],2)):g}'
+        string += f'={float(round(rez["Sy"],2)):g} \\cdot см^2.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+    if True: #Вычисление центра тяжести
+        string = 'Вычисляем положение геометрического центра тяжести контура относительно левого нижнего угла колонны.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$ x_c = \\dfrac{S_{x,0}}{u} = '
+        string += '\\dfrac{' + f'{float(round(rez["Sx"],2)):g}' + '}{' + f'{float(round(rez["Lsum"],3)):g}' + '}='
+        string += f'{float(round(rez["xc"],3)):g} \\cdot см.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = '$ y_c = \\dfrac{S_{y,0}}{u} = '
+        string += '\\dfrac{' + f'{float(round(rez["Sy"],2)):g}' + '}{' + f'{float(round(rez["Lsum"],3)):g}' + '}='
+        string += f'{float(round(rez["yc"],3)):g} \\cdot см.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+    if True: #Вычисление центров тяжести участков
+        string = 'Вычисляем координаты центров тяжести каждого из элементов расчетного контура относительно центра тяжести всего расчетного контура по формулам:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$x_{c,i} = x_{c,0,i} - x_c; \\quad y_{c,i} = y_{c,0,i} - y_c.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+        string = 'Результаты расчета по указанным выше формулам приведены в таблице ниже.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        contours_cent = {'xci, см':[], 'yci, см':[]}
+        contours_cent_names = []
+        for i in range(len(contour_sides)):
+            contours_cent_names.append(contour_sides[i])
+            contours_cent['xci, см'].append(f'{float(round(contour_center[i][0] - rez["xc"],3)):g}')
+            contours_cent['yci, см'].append(f'{float(round(contour_center[i][1] - rez["yc"],3)):g}')
+        contours_cent = pd.DataFrame.from_dict(contours_cent, orient='index', columns=contours_cent_names)
+        st.dataframe(contours_cent, use_container_width=True)
+        table = doc.add_table(contours_cent.shape[0]+1, contours_cent.shape[1]+1)
+        table.style = 'Стиль_таблицы'
+        for j in range(contours_cent.shape[-1]):
+            table.cell(0,j+1).text = contours_cent.columns[j]
+            table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        for i in range(contours_cent.shape[0]):
+            for j in range(contours_cent.shape[-1]):
+                table.cell(i+1,j+1).text = str(contours_cent.values[i,j])
+                table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        table.cell(0,0).text = 'Участок'
+        table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(1,0).paragraphs[0]
+        math2docx.add_math(p, 'x_{c,i}, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(2,0).paragraphs[0]
+        math2docx.add_math(p, 'y_{c,i}, см')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+
+    if True: #Вычисление наиболее удаленных точек
+        string = 'Расстояние до наиболее удаленных от геометрического центра тяжести точек (левой, праврй, нижней, верхней) расчетного контура приведено в таблице ниже:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        max_values = [f'{float(round(rez["xL"],3)):g}',
+                                        f'{float(round(rez["xR"],3)):g}',
+                                        f'{float(round(rez["yB"],3)):g}',
+                                        f'{float(round(rez["yT"],3)):g}']
+        max_points = {'Расстояние, см':max_values}
+        max_points = pd.DataFrame.from_dict(max_points, orient='index', columns=['Левая','Правая','Нижняя','Верхняя'])
+        st.dataframe(max_points, use_container_width=True)
+        table = doc.add_table(2, 5)
+        table.style = 'Стиль_таблицы'
+        table.cell(1,0).text = 'Расстояние, см'
+        table.cell(1,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(0,1).paragraphs[0]
+        math2docx.add_math(p, 'x_{L}')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(0,2).paragraphs[0]
+        math2docx.add_math(p, 'x_{R}')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(0,3).paragraphs[0]
+        math2docx.add_math(p, 'y_{B}')
+        p.paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(0,4).paragraphs[0]
+        math2docx.add_math(p, 'y_{T}')
+        p.paragraph_format.first_line_indent = Mm(0)
+        for i in range(len(max_values)):
+            p = table.cell(1,i+1).paragraphs[0]
+            math2docx.add_math(p, max_values[i])
+            p.paragraph_format.first_line_indent = Mm(0)
+        
+        string = 'Расстояние до наиболее удаленных от центра тяжести точек расчетного контура составляет:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$x_{max} = \\max(|x_{L}|,x_{R})='
+        string += str(round(rez["xmax"],3))
+        string += 'см; \\quad y_{max} = \\max(|y_{B}|,y_{T})='
+        string += str(round(rez["ymax"],3))
+        string += 'см.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+    if True: #Вычисление собственных моментов инерции участков
+        string = 'Собственные моменты инерции участков расчетного контура вычисляются по формулам:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$I_{x,0,i} = \\dfrac{L_{x,i}^3}{12}; \\quad I_{y,0,i} = \\dfrac{L_{y,i}^3}{12}.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+        string = 'Результаты расчета собственных моментов по указанным выше формулам приведены в таблице ниже.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        contours_I0 = {'Ix0i, см3':[], 'Iy0i, см3':[]}
+        contours_I0_names = []
+        for i in range(len(contour_sides)):
+            contours_I0_names.append(contour_sides[i])
+            contours_I0['Ix0i, см3'].append(f'{float(round(rez["Ix0_arr"][i],2))}')
+            #contours_I0['Ix0i, см3'].append(Decimal(round(rez["Ix0_arr"][i],2)).normalize())
+            contours_I0['Iy0i, см3'].append(f'{float(round(rez["Iy0_arr"][i],2))}')
+        contours_I0 = pd.DataFrame.from_dict(contours_I0, orient='index', columns=contours_I0_names)
+        st.dataframe(contours_I0, use_container_width=True)
+        table = doc.add_table(contours_I0.shape[0]+1, contours_I0.shape[1]+1)
+        table.style = 'Стиль_таблицы'
+        for j in range(contours_I0.shape[-1]):
+            table.cell(0,j+1).text = contours_I0.columns[j]
+            table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        for i in range(contours_I0.shape[0]):
+            for j in range(contours_I0.shape[-1]):
+                table.cell(i+1,j+1).text = str(contours_I0.values[i,j])
+                table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        table.cell(0,0).text = 'Участок'
+        table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(1,0).paragraphs[0]
+        math2docx.add_math(p, 'I_{x,0,i}, см^3')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p = table.cell(2,0).paragraphs[0]
+        math2docx.add_math(p, 'I_{y,0,i}, см^3')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+
+    if True: #Вычисление моментов инерции участков
+        string = 'Для вычисления моментов инерции участков контура относительно геометрического центра всего контура используются формулы переноса осей, приведенные ниже.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$I_{x,i} = I_{x,0,i} +  L_i \\cdot x_{c,i}^2; \\quad I_{y,i} = I_{y,0,i} +  L_i \\cdot y_{c,i}^2.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+        string = 'Результаты расчета моментов инерции участков контура относительно геометрического центра всего контура по указанным выше формулам приведены в таблице ниже.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        contours_I = {'Ixi, см3':[], 'Iyi, см3':[]}
+        contours_I_names = []
+        #st.write(rez["Ix_arr"])
+        for i in range(len(contour_sides)):
+            contours_I_names.append(contour_sides[i])
+            #contours_I['Ixi, см3'].append(f'{float(round(rez["Ix_arr"][i],2)):g}')
+            #contours_I['Iyi, см3'].append(f'{float(round(rez["Iy_arr"][i],2)):g}')
+            contours_I['Ixi, см3'].append(f'{float(round(rez["Ix_arr"][i],2))}')
+            contours_I['Iyi, см3'].append(f'{float(round(rez["Iy_arr"][i],2))}')
+        contours_I = pd.DataFrame.from_dict(contours_I, orient='index', columns=contours_I_names)
+        st.dataframe(contours_I, use_container_width=True)
+        table = doc.add_table(contours_I.shape[0]+1, contours_I.shape[1]+1)
+        table.style = 'Стиль_таблицы'
+        for j in range(contours_I.shape[-1]):
+            table.cell(0,j+1).text = contours_I.columns[j]
+            table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        for i in range(contours_I.shape[0]):
+            for j in range(contours_I.shape[-1]):
+                table.cell(i+1,j+1).text = str(contours_I.values[i,j])
+                table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        table.cell(0,0).text = 'Участок'
+        table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
+        p = table.cell(1,0).paragraphs[0]
+        math2docx.add_math(p, 'I_{x,i}, см^3')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+        #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p = table.cell(2,0).paragraphs[0]
+        math2docx.add_math(p, 'I_{y,i}, см^3')
+        p.add_run(' ')
+        p.paragraph_format.first_line_indent = Mm(0)
+
+    if True: #Моменты инерции всего сечения
+        string = 'Моменты инерции всего расчетного контура вычисляем как сумму моментов инерции каждого из участков.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$ I_{x} = \\sum_i{I_{x,i}}= '
+        #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
+        string += f'{float(round(rez["Ix_arr"][0],2))}'
+        for i in range(1, len(rez["Ix_arr"])):
+            if rez["Ix_arr"][i] > 0:
+                string += '+'
+            #string += f'{float(round(rez["Ix_arr"][i],2)):g}'
+            string += f'{float(round(rez["Ix_arr"][i],2))}'
+        #string += f'={float(round(rez["Ix"],2)):g} \\cdot см^3.$'
+        string += f'={float(round(rez["Ix"],2))} \\cdot см^3.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = '$ I_{y} = \\sum_i{I_{y,i}}= '
+        #string += f'{float(round(rez["Iy_arr"][0],2)):g}'
+        string += f'{float(round(rez["Iy_arr"][0],2))}'
+        for i in range(1, len(rez["Iy_arr"])):
+            if rez["Iy_arr"][i] > 0:
+                string += '+'
+            #string += f'{float(round(rez["Iy_arr"][i],2)):g}'
+            string += f'{float(round(rez["Iy_arr"][i],2))}'
+        #string += f'={float(round(rez["Iy"],2)):g} \\cdot см^3.$'
+        string += f'={float(round(rez["Iy"],2))} \\cdot см^3.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+    if True: #Моменты сопротивления расчетного контура
+        string = 'Моменты сопротивления расчетного контура вычисляются по формулам (8.98):'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$ W_{x} = \\dfrac{I_x}{x_{\\max}} = \\dfrac{'
+        #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
+        string += f'{float(round(rez["Ix"],2))}'
+        string += '}{'
+        string += f'{float(round(rez["xmax"],3))}'
+        string += '} = '
+        string += f'{float(round(rez["Wxmin"],2))}'
+        string += '\\cdot см^2.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = '$ W_{y} = \\dfrac{I_y}{y_{\\max}} = \\dfrac{'
+        #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
+        string += f'{float(round(rez["Iy"],2))}'
+        string += '}{'
+        string += f'{float(round(rez["ymax"],3))}'
+        string += '} = '
+        string += f'{float(round(rez["Wymin"],2))}'
+        string += '\\cdot см^2.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+    if True: #Предельные моменты, воспринимаемые бетонным сечением
+        string = 'Предельные моменты, воспринимаемые бетоном в расчетном поперечном сечении вычисляются по формулам (8.94):'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$ M_{bx,ult} = R_{bt} \\cdot h_0 \\cdot W_{x} = '
+        #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
+        string += f'{float(round(Rbt,6)):g} \\cdot {float(round(h0,5)):g} \\cdot  {float(round(rez["Wxmin"],2))} / 100 ='
+        string += f'{float(round(rez["Mbxult"],2))} \\cdot тс \\cdot м.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = '$ M_{by,ult} = R_{bt} \\cdot h_0 \\cdot W_{y} = '
+        #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
+        string += f'{float(round(Rbt,6)):g} \\cdot {float(round(h0,5)):g} \\cdot  {float(round(rez["Wymin"],2))} / 100 ='
+        string += f'{float(round(rez["Mbyult"],2))} \\cdot тс \\cdot м.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+
+        string = 'Примечание. Деление на 100 в данных формулах необходимо для перевода сантиметров в метры.'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+
+    
+    if True: #Проверка условия прочности по бетону:
+        string = 'Проверка прочности выполняется из условия:'
+        st.write(string)
+        doc.add_paragraph().add_run(string)
+        string = '$\\dfrac{F}{F_{b,ult}} + \\left(\\dfrac{\\delta_{Mx} \\cdot M_x}{M_{bx,ult}} + \\dfrac{\\delta_{My} \cdot M_y}{M_{by,ult}}\\right) = k_F + k_M \\le 1.$'
+        st.write(string)
+        math2docx.add_math(doc.add_paragraph(), string.replace('$',''))
+        string = 'Здесь $k_F$ и $k_M$ - коэффициенты использования по силе и моментам соответственно, причем, учитывая положения п. 8.1.46, $k_M \\le 0.5\cdot k_F$. '
+        string += 'Коэффициенты $\\delta_{Mx} \\le 1$ и $\\delta_{My} \\le 1$ также учитывают положения п. 8.1.46, a именно: '
+        string += 'при действии момента в месте приложения сосредоточенной нагрузки половину этого момента учитывают при расчете на продавливание.'
+        st.write(string)
+        p = doc.add_paragraph()
+        p.add_run('Здесь ')
+        math2docx.add_math(p, 'k_F')
+        p.add_run(' и ')
+        math2docx.add_math(p, 'k_M')
+        p.add_run('  - коэффициенты использования по силе и моментам соответственно, причем, учитывая положения п. 8.1.46,  ')
+        math2docx.add_math(p, 'k_M \\le 0.5\cdot k_F')
+        p.add_run('. Коэффициенты ')
+        math2docx.add_math(p, '\\delta_{Mx} \\le 1')
+        p.add_run(' и ')
+        math2docx.add_math(p, '\\delta_{My} \\le 1')
+        p.add_run(' также учитывают положения п. 8.1.46, a именно: ')
+        p.add_run('при действии момента в месте приложения сосредоточенной нагрузки половину этого момента учитывают при расчете на продавливание.')
+        
+    print(1)
+
+
+
+    
+
+
+
+
+    file_stream = io.BytesIO()
+    doc.save(file_stream)
+    st.sidebar.download_button('Сохранить исходные данные', file_name='1.docx', data=file_stream)
+
 
     st.write('В результате подстановки значений найдем $F_{b,ult}='+ str(round(rez['Fbult'])) + '$тс; $F_{b,ult}/1.5=' + str(round(rez['Fbult']/1.5)) + '$тс.' )
 
@@ -570,38 +1116,18 @@ with st.expander('Расчетные выкладки'):
     st.latex('\\dfrac{F}{F_{b,ult}} + \\left(\\dfrac{\delta_M \\cdot M_x}{M_{bx,ult}} + \\dfrac{\\delta_M \cdot M_y}{M_{by,ult}}\\right) = k_F + k_M \\le 1.')
     st.write('Здесь $k_F$ и $k_M$ - коэффициенты использования сечения по силе и моментам соответственно, причем $k_M \le 0.5\cdot k_F$.')
 
-    if abs(rez["ex"]) != 0.0 or abs(rez["ey"]) != 0.0:
-        st.write('Так как положение центра расчетного контура не совпадает с точкой приложения нагрузки, корректируем величину действующих моментов с учетом эксцентриситета.')
-        st.write('Значения эксцентриситетов продольной силы относительно геометрического центра расчетного контура составляют:')
-        st.write('$e_x = x_c - b/2=' + f'''{round(rez["ex"],2):g}''' + 'см; \\quad e_y = y_c - h/2=' f'''{round(rez["ey"],2):g}''' 'см.$')
-        st.write('Таким образом дополнительные моменты от эксцентриситета геометрического центра составляют:')
-        st.write('$M_{x,e} =  - F \\cdot e_x=' + f'''{round(rez["Mxexc"],1):g}''' + 'тсм; \\quad M_{y,e} = - F \\cdot e_y=' f'''{round(rez["Myexc"],1):g}''' 'тсм.$')
-    
-        st.write('Положение центра прочности контура относительно левого нижнего угла колонны вычисляем по формуле:')
-        st.latex('''
-        x_{c,\\gamma} = \\dfrac{\\sum_i \\gamma_i \\cdot S_{x,i}}{\\sum_i \\gamma_i \\cdot L_{i}} = \\dfrac{\\sum_i \\gamma_i \\cdot L_{i} \\cdot x_{0,i}}{\\sum_i \\gamma_i \\cdot L_{i}}; \\quad
-        y_{c,\\gamma} = \\dfrac{\\sum_i \\gamma_i \\cdot S_{y,i}}{\\sum_i \\gamma_i \\cdot L_{i}} = \\dfrac{\\sum_i \\gamma_i \\cdot L_{i} \\cdot y_{0,i}}{\\sum_i \\gamma_i \\cdot L_{i}}.
-        ''')
-        st.write('В результате подстановки значений найдем $x_{c,\\gamma}='+ f'''{round(rez['xcM'],2):g}'''+ '$см; $y_{c,\\gamma}='+ f'''{round(rez['ycM'],2):g}$см.''')
-        
-        st.write('Значения эксцентриситетов продольной силы относительно центра прочности расчетного контура составляют:')
-        st.write('$e_{x,\\gamma} = x_{c,\\gamma} - b/2=' + f'''{round(rez["exM"],2):g}''' + 'см; \\quad e_{y,\\gamma} = y_{c,\\gamma} - h/2=' f'''{round(rez["eyM"],2):g}''' 'см.$')
-        st.write('Таким образом дополнительные моменты от эксцентриситета центра прочности составляют:')
-        st.write('$M_{x,e,\\gamma} =  - F \\cdot e_{x,\\gamma}=' + f'''{round(rez["MxexcM"],1):g}''' + 'тсм; \\quad M_{y,e,\\gamma} = - F \\cdot e_{y,\\gamma}=' f'''{round(rez["MyexcM"],1):g}''' 'тсм.$')
-        st.write('Величины действующих моментов с учетом эксцентриситета для расчета принимаем следующие:')
-        st.latex('M_x = \\max(|M_x + M_{x,e}|; |M_x + M_{x,e,\\gamma}|); M_y = \\max(|M_y + M_{y,e}|; |M_y + M_{y,e,\\gamma}|)')
-        st.write('В результате найдем $M_x = '+ f'''{round(rez["Mxlocmax"],1):g}''' + 'тсм; M_y='+ f'''{round(rez["Mylocmax"],1):g}'''+ 'тсм.$')
+   
 
     st.write('Коэффициенты использования составляют:')
     st.write('$k_F=\\dfrac{F}{F_{b,ult}}=\\dfrac{' + f'''{round(F):g}''' + '}{' f'''{round(rez["Fbult"]):g}''' + '}=' + f'''{round(rez["kF"],3):g}''' + ';$')
     st.write('$k_M=\\dfrac{\\delta_M \cdot M_x}{M_{bx,ult}} + \\dfrac{\\delta_M \cdot M_y}{M_{by,ult}} =\\dfrac{' 
-             + str(deltaM) + '\\cdot' + f'''{round(rez["Mxlocmax"],1):g}''' +  '}{' f'''{round(rez["Mbxult"],1):g}''' + '}+' +
-              '\\dfrac{' + str(deltaM) + '\\cdot' + f'''{round(rez["Mylocmax"],1):g}'''  + '}{' f'''{round(rez["Mbyult"],1):g}''' + '}=' +
+             + str(deltaM) + '\\cdot' + f'''{round(rez["Mxloc"],1):g}''' +  '}{' f'''{round(rez["Mbxult"],1):g}''' + '}+' +
+              '\\dfrac{' + str(deltaM) + '\\cdot' + f'''{round(rez["Myloc"],1):g}'''  + '}{' f'''{round(rez["Mbyult"],1):g}''' + '}=' +
             f'''{round(rez["kM"],3):g}''' + ';$')
-    st.write('$k=k_F+k_M=' + str(round(rez['kF'],3)) + '+' + str(round(rez['kMmax'],3)) + '=' + str(round(rez['k'],3)) + '$.')
+    st.write('$k=k_F+k_M=' + str(round(rez['kF'],3)) + '+' + str(round(rez['kM'],3)) + '=' + str(round(rez['k'],3)) + '$.')
 
 st.write('Коэффициент использования по продольной силе $k_F=' + str(round(rez['kF'],3)) + '$.')
-st.write('Коэффициент использования по моментам $k_М=' + str(round(rez['kMmax'],3)) + '$.')
+st.write('Коэффициент использования по моментам $k_М=' + str(round(rez['kM'],3)) + '$.')
 st.write('Суммарный коэффициент использования $k=' + str(round(rez['k'],3)) + '$.')
 
 
