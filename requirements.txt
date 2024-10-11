@@ -7,3 +7,4 @@ python-docx
 mathml2omml
 latex2mathml
 math2docx
+openpyxl
