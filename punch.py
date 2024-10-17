@@ -92,7 +92,7 @@ available_concretes = table_concretes_data['Class'].to_list()
 
 center = [25.0, 50.0]
 
-def find_contour_geometry (V, M, Rbt, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, qsw, sw_mode):
+def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode):
     #V - массив координат линий контура [   [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
     #M - вектор масс линий
     #Объявляем нулевыми суммарные длину и моменты инерции
@@ -166,8 +166,6 @@ def find_contour_geometry (V, M, Rbt, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xc
     Wxmin = round(min(Wxl, Wxr), 1)
     Wyb, Wyt = Iy/abs(yB), Iy/yT
     Wymin = round(min(Wyb, Wyt), 1)
-    Mbxult = round(Wxmin*h0*Rbt/100, 2)
-    Mbyult = round(Wymin*h0*Rbt/100, 2)
     Mxexc0 = round(F*ex/100, 2)
     Myexc0 = round(F*ey/100, 2)
     if F_dir == 'вниз':
@@ -186,12 +184,33 @@ def find_contour_geometry (V, M, Rbt, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xc
     Mx, My = abs(Mx), abs(My)
     #Предельная сила, воспринимаемая бетоном
     Fbult = round(Lsum*Rbt*h0,1)
+    Mbxult = round(Wxmin*h0*Rbt/100, 2)
+    Mbyult = round(Wymin*h0*Rbt/100, 2)
+    Fswult_check0 = round(Lsum*0.8*qsw,1)
+    Mswxult_check0 = round(Wxmin*0.8*qsw/100, 2)
+    Mswyult_check0 = round(Wymin*0.8*qsw/100, 2)
+    if Fswult_check0 > Fbult:
+        Fswult_check = Fbult
+        Mswxult_check = Mbxult
+        Mswyult_check = Mbyult
+    if Fswult_check0 < 0.25*Fbult:
+        Fswult_check = 0.0
+        Mswxult_check = 0.0
+        Mswyult_check = 0.0
+    if  0.25*Fbult <= Fswult_check0 <= Fbult:
+        Fswult_check = Fswult_check0
+        Mswxult_check = Mswxult_check0
+        Mswyult_check = Mswyult_check0
     #Коэффициент использования по продольной силе
     kbF= round(F/Fbult, 2)
-    kbM0 = abs(Mx)/Mbxult + abs(My)/Mbyult
+    kbM0 = Mx/Mbxult + My/Mbyult
     kbM0 = round(kbM0, 2)
     kbM = round(min(kbM0, kbF/2), 2)
     kb = round(kbF + kbM, 2)
+    swAsw_sol = Rbt*h0*(kb-1)/(0.8*Rsw)
+
+    #print(is_sw, qsw, sw_mode)
+    #print(Fswult_check, Mswxult_check, Mswyult_check)
     xmax = max(abs(xL),xR)
     ymax = max(abs(yB),yT)
     return {'Lsum': Lsum, 'xc': xc, 'yc': yc, 'ex': ex, 'ey': ey,
@@ -580,8 +599,9 @@ if True: #Ввод исходных данных
     else: sw_block=False
 
     qsw = 0.0
+    Rsw = 1.734
     if is_sw:
-        cols2 = st.columns([1,1,1,1,1])
+        cols2 = st.columns([1,1,1,1,1,1])
         
         rtype = cols2[0].selectbox(label='Арматура', options=['A240', 'A400', 'A500'], index=0, label_visibility="visible")
         selected_reinf_data = table_reinf_data.loc[table_reinf_data['Class'] == rtype]
@@ -604,9 +624,11 @@ if True: #Ввод исходных данных
         qsw_max = round(qsw_max,3)
         qsw_min = 0.25*Rbt*h0/0.8
         #qsw_min = round(qsw_min,3)
-        st.write(qsw_max)
+        #st.write(qsw_max)
         ksw0 = 0.8*qsw0/(Rbt*h0)
         ksw0 = round(ksw0,3)
+        if sw_mode == 'проверка':
+            cols2[5].number_input(label='$k_{sw}$, %', step=5.0, format="%.1f", value=ksw0*100, label_visibility="visible", disabled=True)
         ksw = 0.0
         if ksw0<0.25:
             ksw = 0.0
@@ -636,7 +658,7 @@ if True: #Ввод исходных данных
     sizes = [x_cont_min, x_cont_max,y_cont_min, y_cont_max, dx, dy]
 
 if num_elem>=2:
-    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, qsw, sw_mode)
+    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode)
     center = [rez['xc'], rez['yc']]
     #st.write(rez)
 
@@ -855,12 +877,12 @@ if is_init_help: #Расчетные предпосылки
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = 'Введем дополнительно коэффициенты $k_{b,F}$ и $k_{b,M}$ следующим образом:'
+        string = 'Введем дополнительно коэффициенты $k_{b,F}$, $k_{b,M}$ и $k_b$ следующим образом:'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
         string = '$k_{b,F} = \\dfrac{F}{F_{b,ult}}; \\quad'
-        string += ' k_{b,M} = \\dfrac{M_x}{M_{bx,ult}} + \\dfrac{M_y}{M_{by,ult}}.$'
+        string += ' k_{b,M} = \\dfrac{M_x}{M_{bx,ult}} + \\dfrac{M_y}{M_{by,ult}}; \\quad k_b = k_{b,F} + k_{b,M}$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
@@ -871,7 +893,7 @@ if is_init_help: #Расчетные предпосылки
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = 'Здесь $k_{b,F}$ и $k_{b,M}$ – коэффициенты использования прочности бетона расчетного поперечного сечения по силе и моментам соответственно.'
+        string = 'Здесь $k_{b,F}$, $k_{b,M}$ и $k_b$ – коэффициенты использования прочности бетона расчетного поперечного сечения по силе, моментам и суммарный соответственно.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
@@ -927,20 +949,24 @@ if is_init_help: #Расчетные предпосылки
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = '5. В случае, если $k_{b,F} + k_{b,M} \\le 1.0 $ прочность обеспечена без установки поперечной арматуры.'
+        string = '5. Вычисление коэффициента использования прочности бетона расчетного поперечного сечения $ k_{b} = k_{b,F} + k_{b,M}$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = '6. В случае, если $k_{b,F} + k_{b,M} > 2.0 $ прочность не может быть обеспечена, необходимо увеличение габаритов площадки передачи нагрузки, либо толщины плиты, либо класса бетона.'
+        string = '6. В случае, если $k_{b} \\le 1.0 $ прочность обеспечена без установки поперечной арматуры.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = '7. В случае, если $1.0 < k_{b,F} + k_{b,M} \\le 2.0 $ требуется установка поперечной арматуры.'
+        string = '7. В случае, если $k_{b} > 2.0 $ прочность не может быть обеспечена, необходимо увеличение габаритов площадки передачи нагрузки, либо толщины плиты, либо класса бетона.'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+
+        string = '8. В случае, если $1.0 < k_{b} \\le 2.0 $ требуется установка поперечной арматуры.'
         string += ' В этом случае требуемое соотношение $A_{sw}/s_w$, с учетом выражений для $k_{sw}$ и $q_{sw}$ определяется по формуле:'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = '$\\dfrac{A_{sw}}{s_w} \\ge \\dfrac{R_{bt} \\cdot h_0 \\cdot (k_{b,F} + k_{b,M} - 1)}{0.8 \\cdot R_{sw}}.$'
+        string = '$\\dfrac{A_{sw}}{s_w} \\ge \\dfrac{R_{bt} \\cdot h_0 \\cdot (k_{b} - 1)}{0.8 \\cdot R_{sw}}.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
@@ -1674,12 +1700,11 @@ with st.expander('Вычисление усилий, учитываемых в �
         string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} = | ' + str(Mxloc) +'| \\cdot ' + str(deltaMx) + '=' + str(rez['Mx']) +  '\\cdot тсм.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
+
     if rez["ey"] == 0:
         string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} = | ' + str(Myloc) +'| \\cdot ' + str(deltaMy) + '=' + str(rez['My']) +  '\\cdot тсм.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
-
-
 
 with st.expander('Предельные усилия, воспринимаемые бетоном'):
     if True: #Предельная продавливающая сила, воспринимаемая бетоном
@@ -1725,6 +1750,45 @@ with st.expander('Предельные усилия, воспринимаемы�
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
+with st.expander('Прочность по бетону'):
+    string = 'Проверка прочности бетона расчетного поперечного сечения.'
+    st.subheader(string)
+    doc.add_heading(string, level=1)
+    if True: #Проверка по продольной силе
+        string = 'Коэффициент использования прочности бетона расчетного поперечного сечения по силе:'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        string = '$k_{b,F}=\\dfrac{F}{F_{b,ult}}=\\dfrac{'
+        string += str(F) + '}{' + str(rez['Fbult']) + '} = ' + str(rez['kbF']) + '.$'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+    if True: #Проверка по моментам
+        string = 'Коэффициент использования прочности бетона расчетного поперечного сечения по моментам:'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        string = '$k_{b,M}=\\dfrac{M_x}{M_{bx,ult}} + \\dfrac{M_y}{M_{by,ult}} =\\dfrac{'
+        string += str(rez['Mx']) + '}{' + str(rez['Mbxult']) + '} +  \\dfrac{' + str(rez['My']) + '}{' + str(rez['Mbyult'])
+        string += '}=' + str(rez['kbM0']) + '.$'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        if rez['kbM0'] != rez['kbM']:
+            string = 'Условие $k_{b,M} \\le 0.5 \\cdot k_{b,F}$ не выполняется. Вклад моментов ограничивается в соответствии с указаниями п. 8.1.46.'
+            string += ' В расчете принимаем:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$k_{b,M} = 0.5 \\cdot k_{b,F} =' + str(rez['kbM']) + '.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+    if True: #Суммарно
+        string = 'Суммарный (по силе и моментам) коэффициент использования прочности бетона расчетного поперечного сечения:'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        string = '$k_b=k_{b,F}+k_{b,M}=' + str(rez['kbF']) + '+' + str(rez['kbM']) + '=' + str(rez['kb']) + '.$'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+
+    st.write()
 
 if is_sw: #Предельные усилия, воспринимаемые арматурой
     if sw_mode == 'проверка':
@@ -1738,14 +1802,7 @@ if is_sw: #Предельные усилия, воспринимаемые ар�
 
 
 
-with st.expander('Условия прочности'):
-    st.write('Коэффициенты использования составляют:')
-    st.write('$k_F=\\dfrac{F}{F_{b,ult}}=\\dfrac{' + f'''{round(F):g}''' + '}{' f'''{round(rez["Fbult"]):g}''' + '}=' + f'''{round(rez["kbF"],3):g}''' + ';$')
-    st.write('$k_M=\\dfrac{\\delta_M \\cdot M_x}{M_{bx,ult}} + \\dfrac{\\delta_M \\cdot M_y}{M_{by,ult}} =\\dfrac{' 
-             + str(deltaMx) + '\\cdot' + f'''{round(rez["Mxloc"],1):g}''' +  '}{' f'''{round(rez["Mbxult"],1):g}''' + '}+' +
-              '\\dfrac{' + str(deltaMy) + '\\cdot' + f'''{round(rez["Myloc"],1):g}'''  + '}{' f'''{round(rez["Mbyult"],1):g}''' + '}=' +
-            f'''{round(rez["kbM"],3):g}''' + ';$')
-    st.write('$k=k_F+k_M=' + str(round(rez['kbF'],3)) + '+' + str(round(rez['kbM'],3)) + '=' + str(round(rez['kb'],3)) + '$.')
+
 
 st.write('Коэффициент использования по продольной силе $k_{bF}=' + str(round(rez['kbF'],3)) + '$.')
 st.write('Коэффициент использования по моментам $k_{bМ}=' + str(round(rez['kbM'],3)) + '$.')
