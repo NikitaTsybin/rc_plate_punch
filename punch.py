@@ -1,4 +1,5 @@
 from math import pi
+from PIL import Image
 import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
@@ -20,10 +21,10 @@ import io
 
 st.header('Расчет на продавливание плиты')
 
-M_abs = st.sidebar.toggle('Считать момент от эксцентриситета всегда догружающим', value=True)
-delta_M_exc = st.sidebar.toggle('Понижать моменты от эксцентриситетов', value=True)
+
+
 is_init_help = st.sidebar.toggle('Расчетные предпосылки', value=False)
-is_geom_help = st.sidebar.toggle('Подробный расчет геометрических характеристик', value=False)
+is_geom_help = st.sidebar.toggle('Геом. характеристики подробно', value=False)
 
 
 ##pile_punch_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -513,7 +514,7 @@ if True: #Ввод исходных данных
     cT = round(cT,2)
 
     ##cols3 = st.columns([1, 0.5])
-    cols2 = st.columns([1,0.8,0.8,0.8,0.8,0.8,0.7,0.7])
+    cols2 = st.columns([1,0.6,0.6,0.7,0.7,0.7,0.5,0.5])
     ctype = cols2[0].selectbox(label='Бетон', options=available_concretes, index=5, label_visibility="visible")
     selected_concrete_data = table_concretes_data.loc[table_concretes_data['Class'] == ctype]
     selected_concrete_data = selected_concrete_data.to_dict('records')[0]
@@ -533,13 +534,29 @@ if True: #Ввод исходных данных
     Myloc = cols2[5].number_input(label='$M_{y,loc}$, тсм', step=0.5, format="%.2f", value=7.0, label_visibility="visible")
     deltaMx = cols2[6].number_input(label='$\\delta_{Mx}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
     deltaMy = cols2[7].number_input(label='$\\delta_{My}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
+    cols2 = st.columns([1.1, 1.1, 1.1, 1, 1])
+    delta_M_exc = cols2[-1].selectbox(label='$\\delta_{M}$ для $F \\cdot e$', options=['да', 'нет'], index=0, label_visibility="visible")
+    if delta_M_exc == 'да': delta_M_exc=True
+    else: delta_M_exc=False
+    M_abs = cols2[-3].selectbox('Учитывать знак $F \\cdot e$', options=['нет', 'да'], index=0)
+    if M_abs == 'да': M_abs=False
+    else: M_abs=True
+    F_dir = cols2[-2].selectbox('Направление $F$', options=['вверх','вниз'], index=0)
+    if F_dir == 'вверх':
+        image = Image.open("F_up.png")
+    if F_dir == 'вниз':
+        image = Image.open("F_down.png")
+    st.sidebar.image(image)
+    is_sw = cols2[0].selectbox(label='Поперечное арм.', options=['да', 'нет'], index=1, label_visibility="visible")
+    if is_sw == 'да': is_sw=True
+    else: is_sw=False
+    sw_mode = cols2[1].selectbox(label='Режим арм.', options=['подбор','проверка'], index=0, label_visibility="visible")
+    if sw_mode == 'подбор': sw_block=True
+    else: sw_block=False
 
-    is_sw = st.toggle('Поперечное армирование', value=False)
     if is_sw:
-        cols2 = st.columns([1,1,1,1,1,1.5])
-        sw_mode = cols2[5].selectbox(label='Режим', options=['проверка', 'подбор'], index=1, label_visibility="visible")
-        if sw_mode == 'подбор': sw_block=True
-        else: sw_block=False
+        cols2 = st.columns([1,1,1,1,1])
+        
         rtype = cols2[0].selectbox(label='Арматура', options=['A240', 'A400', 'A500'], index=0, label_visibility="visible")
         selected_reinf_data = table_reinf_data.loc[table_reinf_data['Class'] == rtype]
         selected_reinf_data = selected_reinf_data.to_dict('records')[0]
@@ -595,7 +612,7 @@ if True: #Ввод исходных данных
 if num_elem>=2:
     rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs)
     center = [rez['xc'], rez['yc']]
-    st.write(rez)
+    #st.write(rez)
 
 fig, image_stream, image_stream2 = draw_scheme(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
                   red_contours, blue_contours, center, sizes)
@@ -619,7 +636,7 @@ if is_sw: string += ' Поперечная арматура принимаетс
 doc.add_paragraph().add_run(string)
 
 
-if is_init_help:
+if is_init_help: #Расчетные предпосылки
     with st.expander('Расчетные предпосылки'):
         string = 'Расчетные предпосылки.'
         doc.add_heading(string, level=1)
@@ -660,18 +677,21 @@ if is_init_help:
 
         if M_abs:
             if delta_M_exc:
-                string = '$M_x = (|M_{x,loc}| + F \\cdot |e_x|) \\cdot \\delta_{Mx}; \\quad'
-                string += ' M_y = (|M_{y,loc}| + F \\cdot |e_y|) \\cdot \\delta_{My}.$'
+                string = '$M_x = (|M_{x,loc}| + | F \\cdot e_x |) \\cdot \\delta_{Mx}; \\quad'
+                string += ' M_y = (|M_{y,loc}| + | F \\cdot e_y |) \\cdot \\delta_{My}.$'
             else:
-                string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} + F \\cdot |e_x| ; \\quad'
-                string += ' M_y =|M_{y,loc}| \\cdot \\delta_{My} + F \\cdot |e_y|.$'
+                string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} + | F \\cdot e_x| ; \\quad'
+                string += ' M_y =|M_{y,loc}| \\cdot \\delta_{My} + | F \\cdot e_y|.$'
         else:
+            if F_dir == 'вверх': znak = '+'
+            else: znak = '-'
             if delta_M_exc:
-                string = '$M_x = |M_{x,loc} + F \\cdot e_x| \\cdot \\delta_{Mx}; \\quad'
-                string += ' M_y = |M_{y,loc} + F \\cdot e_y| \\cdot \\delta_{My}.$'
+                
+                string = '$M_x = |M_{x,loc}' + znak + 'F \\cdot e_x| \\cdot \\delta_{Mx}; \\quad'
+                string += ' M_y = |M_{y,loc} ' + znak + ' F \\cdot e_y| \\cdot \\delta_{My}.$'
             else:
-                string = '$M_x = |M_{x,loc} \\cdot \\delta_{Mx} + F \\cdot e_x| ; \\quad'
-                string += ' M_y = |M_{y,loc} \\cdot \\delta_{My} + F \\cdot e_y| .$'
+                string = '$M_x = |M_{x,loc} \\cdot \\delta_{Mx} ' + znak + ' F \\cdot e_x| ; \\quad'
+                string += ' M_y = |M_{y,loc} \\cdot \\delta_{My} ' + znak + ' F \\cdot e_y| .$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
@@ -713,7 +733,7 @@ if is_init_help:
         add_text_latex(doc.add_paragraph(), string)
 
         string = 'где $q_{sw}$ – усилие в поперечной арматуре на единицу длины контура расчетного поперечного сечения,'
-        string += ' расположенной в пределах расстояния $0.5 \cdot h_0$ по обе стороны от контура расчетного сечения'
+        string += ' расположенной в пределах расстояния $0.5 \\cdot h_0$ по обе стороны от контура расчетного сечения'
         st.write(string)
         p = doc.add_paragraph()
         add_text_latex(p, string)
@@ -723,7 +743,7 @@ if is_init_help:
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = '$A_{sw}$ – площадь сечения всей поперечной арматуры расположенная в пределах расстояния $0.5 \cdot h_0$ по обе'
+        string = '$A_{sw}$ – площадь сечения всей поперечной арматуры расположенная в пределах расстояния $0.5 \\cdot h_0$ по обе'
         string += ' стороны от контура расчетного поперечного сечения по периметру контура расчетного поперечного сечения (площадь поперечной арматуры в одном каркасе);'
         st.write(string)
         p = doc.add_paragraph()
@@ -890,7 +910,7 @@ if is_init_help:
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = '7. В случае, если $1.0 < k_{b,F} + k_{b,M} \le 2.0 $ требуется установка поперечной арматуры.'
+        string = '7. В случае, если $1.0 < k_{b,F} + k_{b,M} \\le 2.0 $ требуется установка поперечной арматуры.'
         string += ' В этом случае требуемое соотношение $A_{sw}/s_w$, с учетом выражений для $k_{sw}$ и $q_{sw}$ определяется по формуле:'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
@@ -1456,7 +1476,7 @@ with st.expander('Геометрические характеристики ко
             string = 'Координаты центра тяжести контура относительно левого нижнего угла колонны:'
             st.write(string)
             doc.add_paragraph().add_run(string)
-            string = f'$ x_c =  {float(round(rez["xc"],3)):g} \\cdot см; \quad  y_c = {float(round(rez["yc"],3)):g} \\cdot см.$'
+            string = f'$ x_c =  {float(round(rez["xc"],3)):g} \\cdot см; \\quad  y_c = {float(round(rez["yc"],3)):g} \\cdot см.$'
             st.write(string)
             add_math(doc.add_paragraph(), string.replace('$',''))
         
