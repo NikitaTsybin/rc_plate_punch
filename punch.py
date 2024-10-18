@@ -609,6 +609,7 @@ if True: #Ввод исходных данных
     else: sw_block=False
 
     qsw = 0.0
+    qsw0 = 0.0
     Rsw = 1.734
     if is_sw:
         cols2 = st.columns([1,1,1,1,1,1])
