@@ -92,7 +92,7 @@ available_concretes = table_concretes_data['Class'].to_list()
 
 center = [25.0, 50.0]
 
-def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode):
+def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode, sw, nsw):
     #V - массив координат линий контура [   [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
     #M - вектор масс линий
     #Объявляем нулевыми суммарные длину и моменты инерции
@@ -203,15 +203,30 @@ def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaM
         Mswyult_check = Mswyult_check0
     #Коэффициент использования по продольной силе
     kbF= round(F/Fbult, 3)
+    
     kF_check= round(F/(Fbult+Fswult_check), 3)
     kbM0 = Mx/Mbxult + My/Mbyult
     kbM0 = round(kbM0, 3)
     kbM = round(min(kbM0, kbF/2), 3)
-    kM0_check = Mx/(Mbxult+Mswxult_check) + My/(Mbyult+Mswyult_check)
-    kM0_check = round(kM0_check, 3)
+
+    kM_check = Mx/(Mbxult+Mswxult_check) + My/(Mbyult+Mswyult_check)
+    kM0_check = round(kM_check, 3)
     kM_check = round(min(kM0_check, kF_check/2), 3)
     kb = round(kbF + kbM, 3)
-    swAsw_sol = Rbt*h0*(kb-1)/(0.8*Rsw)
+   
+    kbF0= F/Fbult
+    kbM00 = Mx/(Mbxult) + My/(Mbyult)
+    kbM00 = min(kbM00, kbF0/2)
+    kb0 = kbF0 + kbM00
+    sw_Asw_min = Rbt*h0*(kb0-1)/(0.8*Rsw)
+    sw_Asw_max = Rbt*h0*(2-1)/(0.8*Rsw)
+    dsw_min = (sw_Asw_min*sw*4/pi/nsw)**0.5*10
+    dsw_max = (sw_Asw_max*sw*4/pi/nsw)**0.5*10
+    dsw_min = round(dsw_min,1)
+    dsw_max = round(dsw_max,1)
+    sw_Asw_min = round(sw_Asw_min, 4)
+    sw_Asw_max = round(sw_Asw_max, 4)
+
     k_check = round(kF_check + kM_check, 3)
 
     #print(is_sw, qsw, sw_mode)
@@ -235,7 +250,9 @@ def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaM
             'Fswult_check0': Fswult_check0, 'Mswxult_check0': Mswxult_check0, 'Mswyult_check0': Mswyult_check0,
             'Fswult_check': Fswult_check, 'Mswxult_check': Mswxult_check, 'Mswyult_check': Mswyult_check,
             'kbF': kbF, 'kbM0': kbM0, 'kbM': kbM, 'kb': kb,
-            'kF_check': kF_check, 'kM0_check': kM0_check, 'kM_check': kM_check, 'k_check': k_check
+            'kF_check': kF_check, 'kM0_check': kM0_check, 'kM_check': kM_check, 'k_check': k_check,
+            'sw_Asw_min': sw_Asw_min, 'dsw_min': dsw_min,
+            'sw_Asw_max': sw_Asw_max, 'dsw_max': dsw_max
             }
 
 def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
@@ -582,13 +599,13 @@ if True: #Ввод исходных данных
     Rbt = round(Rbt,4)
     #st.write(Rbt)
     #Rbt = 0.01*Rbt
-    F = cols2[3].number_input(label='$F$, тс', step=0.5, format="%.1f", value=28.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
+    F = cols2[3].number_input(label='$F$, тс', step=1.0, format="%.1f", value=49.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
     Mxloc = cols2[4].number_input(label='$M_{x,loc}$, тсм', step=0.5, format="%.2f", value=4.0, label_visibility="visible")
     Myloc = cols2[5].number_input(label='$M_{y,loc}$, тсм', step=0.5, format="%.2f", value=7.0, label_visibility="visible")
     deltaMx = cols2[6].number_input(label='$\\delta_{Mx}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
     deltaMy = cols2[7].number_input(label='$\\delta_{My}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
     cols2 = st.columns([1.1, 1.1, 1.1, 1, 1])
-    delta_M_exc = cols2[-1].selectbox(label='$\\delta_{M}$ для $F \\cdot e$', options=['да', 'нет'], index=0, label_visibility="visible")
+    delta_M_exc = cols2[-1].selectbox(label='$\\delta_{M}$ для $F \\cdot e$', options=['нет','да'], index=0, label_visibility="visible")
     if delta_M_exc == 'да': delta_M_exc=True
     else: delta_M_exc=False
     M_abs = cols2[-3].selectbox('Учитывать знак $F \\cdot e$', options=['нет', 'да'], index=0)
@@ -611,6 +628,8 @@ if True: #Ввод исходных данных
     qsw = 0.0
     qsw0 = 0.0
     Rsw = 1.734
+    sw = 6.0
+    nsw = 2
     if is_sw:
         cols2 = st.columns([1,1,1,1,1,1])
         
@@ -669,7 +688,7 @@ if True: #Ввод исходных данных
     sizes = [x_cont_min, x_cont_max,y_cont_min, y_cont_max, dx, dy]
 
 if num_elem>=2:
-    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode)
+    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
     center = [rez['xc'], rez['yc']]
     #st.write(rez)
 
@@ -1831,50 +1850,66 @@ if rez['kb'] <=2: #Если прочность может быть обеспе�
                 string += str(rez['Fswult_check0']) + '\\cdot тс.$'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
-                if qsw0>qsw:
-                    string = 'Так как $F_{sw,ult} \\ge F_{b,ult}$, вклад поперечного армирования ограничиваем. В расчете принимаем:'
+
+                if rez['Fswult_check0'] >= 0.25*rez['Fbult']:
+                    string = 'Условие $F_{sw,ult}  = ' + str(rez['Fswult_check0']) +  ' \\ge 0.25 \\cdot F_{b,ult} =' + str(round(0.25*rez['Fbult'],1)) +  ' $ выполняется.'
+                    string += ' Поперечная арматура учитывается в расчете.'
+                    if rez['Fswult_check0']<rez['Fbult']:
+                        string += ' Условие $F_{sw,ult}  = ' + str(rez['Fswult_check0']) +  ' \\le F_{b,ult} =' + str(rez['Fbult']) +  ' $ выполняется.'
+                        string += ' Вклад поперечного армирования не ограничивается.'
+                        
+                    if rez['Fswult_check0']>rez['Fbult']:
+                        string += ' Условие $F_{sw,ult} \\le F_{b,ult}$ не выполняется, вклад поперечного армирования ограничиваем. В расчете принимаем: '
+                        string += '$F_{sw,ult} = F_{b,ult}=' + str(rez['Fswult_check']) +  '\\cdot тс.$'
+
+                if rez['Fswult_check0']<0.25*rez['Fbult']:
+                    string = 'Так как $F_{sw,ult} \\le 0.25 \\cdot F_{b,ult} = ' + str(round(0.25*rez['Fbult'],1)) + '$ , поперечную арматуру не учитываем в расчете. В расчете принимаем:'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
-                    string = '$F_{sw,ult} = F_{b,ult}=' + str(rez['Fbult']) +  '\\cdot тс.$'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
+                    string = '$F_{sw,ult} = M_{sw,x,ult} = M_{sw,y,ult} = 0.$'
+
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
                 
-
-                string = 'Предельные моменты, воспринимаемые поперечной арматурой, вычисляются по формуле (8.97):'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-                string = '$M_{sw,ult}= 0.8 \\cdot q_{sw} \\cdot W_{sw}.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-                string = 'В соответствии с п. 8.1.52, принято, что поперечная арматура расположена равномерно вдоль расчетного контура продавливания, т.е. $W_{sw}=W_b$. В результате:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-                string = '$M_{sw,x,ult}= 0.8 \\cdot q_{sw} \\cdot W_{bx} = '
-                string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Wxmin']) + '/100='
-                string += str(rez['Mswxult_check0']) + '\\cdot тсм;$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = '$ M_{sw,y,ult}= 0.8 \\cdot q_{sw} \\cdot W_{by} = '
-                string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Wymin']) + '/100='
-                string += str(rez['Mswyult_check0']) + '\\cdot тсм.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = 'Примечание. Деление на 100 в данных формулах необходимо для перевода сантиметров в метры.'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-                if qsw0>qsw:
-                    string = 'Так как $M_{sw,x,ult} \\ge M_{bx,ult}$ и $M_{sw,y,ult} \\ge M_{by,ult}$, вклад поперечного армирования ограничиваем. В расчете принимаем:'
+                
+           
+                if rez['Fswult_check0']>=0.25*rez['Fbult']:
+                    string = 'Предельные моменты, воспринимаемые поперечной арматурой, вычисляются по формуле (8.97):'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
-                    string = '$M_{sw,x,ult} = M_{bx,ult}=' + str(rez['Mswxult_check']) +  '\\cdot тсм; \\quad'
-                    string += ' M_{sw,y,ult} = M_{by,ult}=' + str(rez['Mswyult_check'])
-                    string += '\\cdot тсм.$'
+
+                    string = '$M_{sw,ult}= 0.8 \\cdot q_{sw} \\cdot W_{sw}.$'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
+
+                    string = 'В соответствии с п. 8.1.52, принято, что поперечная арматура расположена равномерно вдоль расчетного контура продавливания, т.е. $W_{sw}=W_b$. В результате:'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+
+                    string = '$M_{sw,x,ult}= 0.8 \\cdot q_{sw} \\cdot W_{bx} = '
+                    string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Wxmin']) + '/100='
+                    string += str(rez['Mswxult_check0']) + '\\cdot тсм;$'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+                    string = '$ M_{sw,y,ult}= 0.8 \\cdot q_{sw} \\cdot W_{by} = '
+                    string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Wymin']) + '/100='
+                    string += str(rez['Mswyult_check0']) + '\\cdot тсм.$'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+                    string = 'Примечание. Деление на 100 в данных формулах необходимо для перевода сантиметров в метры.'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+
+                    if qsw0>qsw:
+                        string = 'Так как $M_{sw,x,ult} \\ge M_{bx,ult}$ и $M_{sw,y,ult} \\ge M_{by,ult}$, вклад поперечного армирования ограничиваем. В расчете принимаем:'
+                        st.write(string)
+                        add_text_latex(doc.add_paragraph(), string)
+                        string = '$M_{sw,x,ult} = M_{bx,ult}=' + str(rez['Mswxult_check']) +  '\\cdot тсм; \\quad'
+                        string += ' M_{sw,y,ult} = M_{by,ult}=' + str(rez['Mswyult_check'])
+                        string += '\\cdot тсм.$'
+                        st.write(string)
+                        add_text_latex(doc.add_paragraph(), string)
 
             with st.expander('Проверка прочности с поперечной арматурой'):
                 string = 'Проверка прочности бетона расчетного поперечного сечения.'
@@ -1913,7 +1948,7 @@ if rez['kb'] <=2: #Если прочность может быть обеспе�
                     string = '$k=k_{F}+k_{M}=' + str(rez['kF_check']) + '+' + str(rez['kM_check']) + '=' + str(rez['k_check']) + '.$'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
-            if True: #Результаты проверки прочности по бетону
+            if True: #Результаты проверки прочности с арматурой
                 if rez['k_check'] <= 1:
                     string = 'Так как $k=' + str(rez['k_check'])+ '<1$ прочность обеспечена.'
                     st.write(string)
@@ -1922,13 +1957,37 @@ if rez['kb'] <=2: #Если прочность может быть обеспе�
                     string = 'Так как $k=' + str(rez['k_check'])+ '>1$ прочность не обеспечена, необходимо увеличение поперечного армирования.'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
+                    string = 'Минимальное значение $A_{sw}/s_{w}=' + str(rez['sw_Asw_min']) + ' \\cdot см^2 / см.$'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+                    string = 'При заданном шаге рядов поперечного армирования и числе стержней, пересекающих пирамиду продавливания, минимальный диаметр стержня составляет $' + str(rez['dsw_min']) + ' \\cdot мм.$'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+                string = 'При заданном шаге рядов поперечного армирования и числе стержней, пересекающих пирамиду продавливания, максимальный диаметр стержня составляет $' + str(rez['dsw_max']) + ' \\cdot мм.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
 
 
         if sw_mode == 'подбор':
-            if rez['kb'] <= 1: #Если прочность может быть обеспечена
+            if rez['kb'] <= 1: #Если поперечная арматура не требуется
                 string = 'Поперечная арматура не требуется.'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
+            if rez['kb'] > 1: #Если поперечная арматура требуется
+                with st.expander('Расчет требуемого поперечного армирования'):
+                    string = 'Требуемая интенсивность поперечного армирования.'
+                    st.subheader(string)
+                    doc.add_heading(string, level=1)
+                    string = 'Минимальное значение $A_{sw}/s_{w}$ вычисляется по формуле:'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+                    string = '$\\dfrac{A_{sw}}{s_{w}} = \\dfrac{R_{bt} \\cdot h_0 \\cdot (k_b - 1)}{0.8 \\cdot R_{sw}}='
+                    string += ' \\dfrac{' + 'R_{bt}'  + ' \\cdot ' +  str(h0) + ' \\cdot (' + str(rez['kb']) +  '- 1)}{0.8 \\cdot ' + str(Rsw) +'}=' + str(rez['sw_Asw_min'])
+                    string += ' \\cdot см^2 / см.$'
+                    st.write(string)
+                    add_text_latex(doc.add_paragraph(), string)
+                    st.write(rez)
+
 
 
 cols = st.columns([1,1,1])
