@@ -25,6 +25,7 @@ qsw0 = 0.0
 Rsw = 1.734
 sw = 6.0
 nsw = 2
+kh0 = 1.5
 center = [25.0, 50.0]
 
 st.header('Расчет на продавливание плиты')
@@ -682,8 +683,8 @@ if True: #Ввод исходных данных
         ksw0 = 0.8*qsw0/(Rbt*h0)
         ksw0 = round(ksw0,3)
         if sw_mode == 'проверка':
-            cols2[5].number_input(label='$k_{sw}$, %', step=5.0, format="%.1f", value=ksw0*100, label_visibility="visible", disabled=True)
-        kh0 = cols2[6].number_input(label='$k \\cdot h_0$', step=0.1, format="%.1f", value=1.5, label_visibility="visible")
+            cols2[6].number_input(label='$k_{sw}$, %', step=5.0, format="%.1f", value=ksw0*100, label_visibility="visible", disabled=True)
+        kh0 = cols2[5].number_input(label='$k \\cdot h_0$', step=0.1, format="%.1f", value=1.5, label_visibility="visible")
         ksw = 0.0
         if ksw0<0.25:
             ksw = 0.0
