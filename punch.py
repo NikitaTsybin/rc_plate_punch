@@ -19,6 +19,14 @@ import mathml2omml
 from docx.oxml import parse_xml
 import io
 
+dias = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25]
+qsw = 0.0
+qsw0 = 0.0
+Rsw = 1.734
+sw = 6.0
+nsw = 2
+center = [25.0, 50.0]
+
 st.header('Расчет на продавливание плиты')
 
 
@@ -90,7 +98,28 @@ table_concretes_data = pd.read_excel('RC_data.xlsx', sheet_name="Concretes_SP63"
 table_reinf_data = pd.read_excel('RC_data.xlsx', sheet_name="Reinforcement_SP63", header=[0])
 available_concretes = table_concretes_data['Class'].to_list()
 
-center = [25.0, 50.0]
+
+
+def solve_arm (Asw_sw, h0, Lx, Ly):
+    nswmin = 1
+    nswmax = round(h0/5)
+    if nswmax>10: nswmax = 10
+    if nswmax < 3: nswmax = 3
+    nsw_arr = [round(nswmin + i) for i in range(nswmax-nswmin+1)]
+    sw_min = 5
+    sw_max = min(Lx/4, Ly/4)
+    sw_num = 6
+    sw_step = round((sw_max-sw_min)/sw_num,2)
+    sw_arr = [round(sw_min + i*sw_step,1) for i in range(sw_num+1)]
+    dsw_arr = [[] for i in range(len(nsw_arr))]
+    for i in range(len(nsw_arr)):
+        for j in range(len(sw_arr)):
+            tmp = round((Asw_sw*sw_arr[j]*4/(nsw_arr[i]*pi))**0.5*10,2)
+            if tmp>25: tmp = '-'
+            dsw_arr[i].append(tmp)
+    return nsw_arr, sw_arr, dsw_arr
+
+
 
 def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode, sw, nsw):
     #V - массив координат линий контура [   [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
@@ -219,11 +248,14 @@ def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaM
     kbM00 = min(kbM00, kbF0/2)
     kb0 = kbF0 + kbM00
     sw_Asw_min = Rbt*h0*(kb0-1)/(0.8*Rsw)
-    sw_Asw_max = Rbt*h0*(2-1)/(0.8*Rsw)
-    dsw_min = (sw_Asw_min*sw*4/pi/nsw)**0.5*10
-    dsw_max = (sw_Asw_max*sw*4/pi/nsw)**0.5*10
-    dsw_min = round(dsw_min,1)
-    dsw_max = round(dsw_max,1)
+    sw_Asw_max = Rbt*h0/(0.8*Rsw)
+    if sw_Asw_min > 0:
+        dsw_min = (sw_Asw_min*sw*4/pi/nsw)**0.5*10.0
+    else: dsw_min = 0
+    dsw_max = (sw_Asw_max*sw*4/pi/nsw)**0.5*10.0
+    print(dsw_min, dsw_max)
+    dsw_min = round(dsw_min,2)
+    dsw_max = round(dsw_max,2)
     sw_Asw_min = round(sw_Asw_min, 4)
     sw_Asw_max = round(sw_Asw_max, 4)
 
@@ -596,7 +628,7 @@ if True: #Ввод исходных данных
     RbtMPA = cols2[2].number_input(label='$R_{bt}$, МПа', step=0.05, format="%.2f", value=Rbt01, min_value=0.1, max_value=2.2, label_visibility="visible", disabled=True)
     RbtMPA = round(RbtMPA,4)
     Rbt = 0.01019716213*RbtMPA
-    Rbt = round(Rbt,4)
+    Rbt = round(Rbt,5)
     #st.write(Rbt)
     #Rbt = 0.01*Rbt
     F = cols2[3].number_input(label='$F$, тс', step=1.0, format="%.1f", value=49.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
@@ -625,11 +657,7 @@ if True: #Ввод исходных данных
     if sw_mode == 'подбор': sw_block=True
     else: sw_block=False
 
-    qsw = 0.0
-    qsw0 = 0.0
-    Rsw = 1.734
-    sw = 6.0
-    nsw = 2
+
     if is_sw:
         cols2 = st.columns([1,1,1,1,1,1])
         
@@ -644,7 +672,7 @@ if True: #Ввод исходных данных
         nsw = round(nsw)
         sw = cols2[3].number_input(label='$s_w$, см', step=5.0, format="%.2f", value=6.0, min_value=0.0, max_value=100.0, label_visibility="visible", disabled=sw_block)
         sw = round(sw,2)
-        dsw = cols2[4].selectbox(label='$d_{sw}$, мм', options=[6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 32], index=0, label_visibility="visible", disabled=sw_block)
+        dsw = cols2[4].selectbox(label='$d_{sw}$, мм', options=dias, index=0, label_visibility="visible", disabled=sw_block)
         dsw = round(dsw)
         Asw = pi*dsw*dsw/4*nsw/10/10
         Asw= round(Asw,3)
@@ -1982,11 +2010,19 @@ if rez['kb'] <=2: #Если прочность может быть обеспе�
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
                     string = '$\\dfrac{A_{sw}}{s_{w}} = \\dfrac{R_{bt} \\cdot h_0 \\cdot (k_b - 1)}{0.8 \\cdot R_{sw}}='
-                    string += ' \\dfrac{' + 'R_{bt}'  + ' \\cdot ' +  str(h0) + ' \\cdot (' + str(rez['kb']) +  '- 1)}{0.8 \\cdot ' + str(Rsw) +'}=' + str(rez['sw_Asw_min'])
+                    string += ' \\dfrac{' + str(Rbt)  + ' \\cdot ' +  str(h0) + ' \\cdot (' + str(rez['kb']) +  '- 1)}{0.8 \\cdot ' + str(Rsw) +'}=' + str(rez['sw_Asw_min'])
                     string += ' \\cdot см^2 / см.$'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
-                    st.write(rez)
+                    solve_d = solve_arm(rez['sw_Asw_min'], h0, dx, dy)
+                    col_names = solve_d[1]
+                    row_names = solve_d[0]
+                    for i in range(len(col_names)):
+                        col_names[i] = 'sw=' + str(col_names[i]) + 'см'
+                    for i in range(len(row_names)):
+                        row_names[i] = 'nsw=' + str(row_names[i]) + 'шт'
+                    st.write(pd.DataFrame(solve_d[2],index=row_names,columns=col_names))
+                    #st.write(rez)
 
 
 
