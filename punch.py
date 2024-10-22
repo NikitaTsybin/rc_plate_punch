@@ -9,7 +9,6 @@ from decimal import Decimal
 import docx
 from docx import Document
 from docx.shared import Pt
-##import docx_svg_patch
 from docx.shared import Mm
 from docx.shared import RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -18,6 +17,13 @@ import latex2mathml.converter
 import mathml2omml
 from docx.oxml import parse_xml
 import io
+##punch_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+##+ '/pages/punch/')
+##sys.path.append(punch_dir)
+
+from word_func import *
+from draw_func import *
+from init_help import *
 
 dias = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25]
 qsw = 0.0
@@ -25,8 +31,8 @@ qsw0 = 0.0
 Rsw = 1.734
 sw = 6.0
 nsw = 2
-kh0 = 1.5
 center = [25.0, 50.0]
+kh0 = 1.5
 
 st.header('Расчет на продавливание плиты')
 
@@ -34,67 +40,12 @@ st.header('Расчет на продавливание плиты')
 
 is_init_help = st.sidebar.toggle('Расчетные предпосылки', value=False)
 is_geom_help = st.sidebar.toggle('Геом. характеристики подробно', value=False)
-
-
-##pile_punch_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-##+ '/pages/pile_punch/')
-##sys.path.append(pile_punch_dir)
-
-def _formula(latex_string: str) -> typing.Any:
-    mathml_output = latex2mathml.converter.convert(latex_string)
-    omml_output = mathml2omml.convert(mathml_output)
-    xml_output = (
-        f'<p xmlns:m="http://schemas.openxmlformats.org/officeDocument'
-        f'/2006/math">{omml_output}</p>'
-    )
-    return parse_xml(xml_output)[0]
-
-def add_math(p, latex_string) -> None:
-    p._p.append(_formula(latex_string))
-
-def divide_latex(string):
-    string_text, string_latex = [[]], [[]]
-    if string[0] == '$': cursor = 1
-    else: cursor = -1
-    if cursor == 1 and string[0] != '$':
-        string_latex[-1].append(string[0])
-    else: string_text[-1].append(string[0])
-    for i in range(1, len(string)):
-        if string[i] == '$':
-            cursor = cursor*(-1)
-            string_latex.append([])
-            string_text.append([])
-        if cursor == 1 and string[i] != '$':
-            string_latex[-1].append(string[i])
-            string_text[-1] = 'NONE'
-        if cursor == -1 and string[i] != '$':
-            string_text[-1].append(string[i])
-            string_latex[-1] = 'NONE'
-    for i in range(len(string_text)):
-        temp = ''
-        for j in string_text[i]: temp += j
-        string_text[i] = temp
-    for i in range(len(string_latex)):
-        temp = ''
-        for j in string_latex[i]: temp += j
-        string_latex[i] = temp
-    return string_text, string_latex
-
-def add_text_latex (p, string):
-    string_text, string_latex = divide_latex(string)
-    for i in range(len(string_text)):
-        if string_text[i] != 'NONE': p.add_run(string_text[i])
-        else: add_math(p, string_latex[i])
-
-def delete_paragraph(paragraph):
-    p = paragraph._element
-    p.getparent().remove(p)
-    paragraph._p = paragraph._element = None
-
 table_concretes_data = pd.read_excel('RC_data.xlsx', sheet_name="Concretes_SP63", header=[0])
 table_reinf_data = pd.read_excel('RC_data.xlsx', sheet_name="Reinforcement_SP63", header=[0])
 available_concretes = table_concretes_data['Class'].to_list()
 
+
+init_data()
 
 
 def solve_arm (Asw_sw, h0, Lx, Ly):
@@ -250,16 +201,12 @@ def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaM
         dsw_min = (sw_Asw_min*sw*4/pi/nsw)**0.5*10.0
     else: dsw_min = 0
     dsw_max = (sw_Asw_max*sw*4/pi/nsw)**0.5*10.0
-    print(dsw_min, dsw_max)
     dsw_min = round(dsw_min,2)
     dsw_max = round(dsw_max,2)
     sw_Asw_min = round(sw_Asw_min, 4)
     sw_Asw_max = round(sw_Asw_max, 4)
-
+    
     k_check = round(kF_check + kM_check, 3)
-
-    #print(is_sw, qsw, sw_mode)
-    #print(Fswult_check, Mswxult_check, Mswyult_check)
     xmax = max(abs(xL),xR)
     ymax = max(abs(yB),yT)
     return {'Lsum': Lsum, 'xc': xc, 'yc': yc, 'ex': ex, 'ey': ey,
@@ -391,186 +338,11 @@ def generate_red_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
             contour_x[1] = b+cR
         contour.append([contour_x, contour_y])
     return contour
-    
-def draw_scheme(b, h, h0,
-                cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
-                red_contours, blue_contours, center, sizes):
-    x_cont_min, x_cont_max,y_cont_min, y_cont_max, dx, dy = sizes
-    arrows_props = dict(arrowcolor="black", arrowsize=2.5, arrowwidth=0.5, arrowhead=5, axref='x', ayref='y', xref='x', yref='y', arrowside='end')
-    text_props = dict(font=dict(color='black',size=14), showarrow=False, bgcolor="#ffffff")
-    smax = max(dx, dy)
-    fig = go.Figure()
-    #Добавляем колонну
-    xx = [0, b, b, 0, 0]
-    yy = [0, 0, h, h, 0]
-    #hatch = dict(fillpattern=dict(fgcolor='black', size=10, fillmode='replace', shape="/"))
-    #**hatch
-    fig.add_trace(go.Scatter(x=xx, y=yy, showlegend=False, fill='toself', fillcolor = 'rgba(128, 128, 128, 0.3)', mode='lines', line=dict(color='black', width=1.5)))
-    fig.add_trace(go.Scatter(x=[0, b], y=[h/2, h/2], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_trace(go.Scatter(x=[b/2, b/2], y=[0, h], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_trace(go.Scatter(x=xx, y=yy, showlegend=False, mode='lines', line=dict(color='black')))
-
-    #Красные линии
-    for contour in red_contours:
-        fig.add_trace(go.Scatter(x=contour[0], y=contour[1], showlegend=False, mode='lines', line=dict(color='red', width=1.5)))
-    #Линии контура
-    for contour in blue_contours:
-        fig.add_trace(go.Scatter(x=contour[0], y=contour[1], showlegend=False, mode='lines', line=dict(color='blue', width=3)))
-
-    #НИЖНЯЯ РАЗМЕРНАЯ ЦЕПОЧКА
-    #Добавляем ширину колонны
-    add = 0.1*smax
-    fig.add_annotation(x=0, ax=b, y=y_cont_min-add, ay=y_cont_min-add, **arrows_props)
-    fig.add_annotation(x=b, ax=0, y=y_cont_min-add, ay=y_cont_min-add, **arrows_props)
-    fig.add_trace(go.Scatter(x=[0, 0], y=[0, y_cont_min-1.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_trace(go.Scatter(x=[b, b], y=[0, y_cont_min-1.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=b/2, y=y_cont_min-0.95*add, text=f'{float(b):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-    #Добавляем ширину контура
-    fig.add_annotation(x=x_cont_min, ax=x_cont_max, y=y_cont_min-2*add, ay=y_cont_min-2*add, **arrows_props)
-    fig.add_annotation(x=x_cont_max, ax=x_cont_min, y=y_cont_min-2*add, ay=y_cont_min-2*add, **arrows_props)
-    fig.add_trace(go.Scatter(x=[x_cont_min, x_cont_min], y=[0, y_cont_min-2.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_trace(go.Scatter(x=[x_cont_max, x_cont_max], y=[0, y_cont_min-2.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=(x_cont_max+x_cont_min)/2, y=y_cont_min-1.95*add, text=f'{float(abs(x_cont_max-x_cont_min)):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-    #Размер от колонны до левой грани контура
-    if abs(x_cont_min)>0:
-        fig.add_annotation(x=0, ax=x_cont_min, y=y_cont_min-add, ay=y_cont_min-add, **arrows_props)
-        fig.add_annotation(x=x_cont_min, ax=0, y=y_cont_min-add, ay=y_cont_min-add, **arrows_props)
-        fig.add_trace(go.Scatter(x=[x_cont_min, x_cont_min], y=[0, y_cont_min-1.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-        fig.add_annotation(dict(x=x_cont_min/2, y=y_cont_min-0.95*add, text=f'{float(abs(x_cont_min)):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-    #Размер от колонны до правой грани контура
-    if abs(x_cont_max)>b:
-        fig.add_annotation(x=b, ax=x_cont_max, y=y_cont_min-add, ay=y_cont_min-add, **arrows_props)
-        fig.add_annotation(x=x_cont_max, ax=b, y=y_cont_min-add, ay=y_cont_min-add, **arrows_props)
-        fig.add_trace(go.Scatter(x=[x_cont_max, x_cont_max], y=[0, y_cont_min-1.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-        fig.add_annotation(dict(x=(x_cont_max+b)/2, y=y_cont_min-0.95*add, text=f'{float(abs(x_cont_max-b)):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-
-    #Добавляем высоту колонны
-    fig.add_annotation(x=x_cont_min-add, ax=x_cont_min-add, y=0, ay=h, **arrows_props)
-    fig.add_annotation(x=x_cont_min-add, ax=x_cont_min-add, y=h, ay=0, **arrows_props)
-    fig.add_trace(go.Scatter(x=[0, x_cont_min-1.1*add], y=[0, 0], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_trace(go.Scatter(x=[0, x_cont_min-1.1*add], y=[h, h], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=x_cont_min-1.05*add, y=h/2, text=f'{float(h):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-    #Добавляем высоту контура
-    fig.add_annotation(x=x_cont_min-2*add, ax=x_cont_min-2*add, y=y_cont_min, ay=y_cont_max, **arrows_props)
-    fig.add_annotation(x=x_cont_min-2*add, ax=x_cont_min-2*add, y=y_cont_max, ay=y_cont_min, **arrows_props)
-    fig.add_trace(go.Scatter(x=[x_cont_min, x_cont_min-2.1*add], y=[y_cont_min, y_cont_min], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_trace(go.Scatter(x=[x_cont_min, x_cont_min-2.1*add], y=[y_cont_max, y_cont_max], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=x_cont_min-2.05*add, y=(y_cont_max+y_cont_min)/2, text=f'{float(abs(y_cont_max-y_cont_min)):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-    #Размер от колонны до нижней грани контура
-    if abs(y_cont_min)>0:
-        fig.add_annotation(x=x_cont_min-add, ax=x_cont_min-add, y=0, ay=y_cont_min, **arrows_props)
-        fig.add_annotation(x=x_cont_min-add, ax=x_cont_min-add, y=y_cont_min, ay=0, **arrows_props)
-        fig.add_trace(go.Scatter(x=[0, x_cont_min-1.1*add], y=[y_cont_min, y_cont_min], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-        fig.add_annotation(dict(x=x_cont_min-1.05*add, y=(y_cont_min)/2, text=f'{float(abs(y_cont_min)):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-    #Размер от колонны до верхней грани контура
-    if abs(y_cont_max)>h:
-        fig.add_annotation(x=x_cont_min-add, ax=x_cont_min-add, y=h, ay=y_cont_max, **arrows_props)
-        fig.add_annotation(x=x_cont_min-add, ax=x_cont_min-add, y=y_cont_max, ay=h, **arrows_props)
-        fig.add_trace(go.Scatter(x=[0, x_cont_min-1.1*add], y=[y_cont_min, y_cont_min], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-        fig.add_annotation(dict(x=x_cont_min-1.05*add, y=(y_cont_max+h)/2, text=f'{float(abs(y_cont_max-h)):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-      
-    arrows_axes_props = dict(arrowcolor="red", arrowsize=3, arrowwidth=0.7, arrowhead=3, axref='x', ayref='y', xref='x', yref='y', arrowside='end')
-    text_props_axes = dict(font=dict(color='red',size=16), showarrow=False)
-    #Оси колонны
-    fig.add_annotation(x=x_cont_max+2*add, ax=b/2, y=h/2, ay=h/2, **arrows_axes_props)
-    fig.add_annotation(x=b/2, ax=b/2, y=y_cont_max+2.5*add, ay=h/2, **arrows_axes_props)
-
-    if round(center[1],3)!=round(h/2,3): #Если ось х контура не совпадает с центом колонны, то дополнительно рисуем оси контура
-        fig.add_annotation(x=x_cont_max+2*add, ax=center[0], y=center[1], ay=center[1], **arrows_axes_props)
-        fig.add_annotation(dict(x=x_cont_max+2*add, y=h/2, text='x', textangle=0, yanchor='middle',xanchor='left', **text_props_axes))
-        fig.add_annotation(dict(x=x_cont_max+2*add, y=center[1], text='xc', textangle=0, yanchor='middle',xanchor='left', **text_props_axes))
-        #Добавляем эксцентриситет
-        fig.add_annotation(x=x_cont_max, ax=x_cont_max, y=h/2, ay=center[1], **arrows_props)
-        fig.add_annotation(x=x_cont_max, ax=x_cont_max, y=center[1], ay=h/2, **arrows_props)
-        fig.add_annotation(dict(x=x_cont_max-0.05*add, y=(center[1]+h/2)/2, text=f'{float(round(abs(center[1]-h/2),2)):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-    else:
-        fig.add_annotation(dict(x=x_cont_max+2*add, y=center[1], text='x, xc', textangle=0, yanchor='middle',xanchor='left', **text_props_axes))
-    
-    if round(center[0],3)!=round(b/2,3):  #Если ось y контура не совпадает с центом колонны, то дополнительно рисуем оси контура
-        fig.add_annotation(x=center[0], ax=center[0], y=y_cont_max+2.5*add, ay=center[1], **arrows_axes_props)
-        fig.add_annotation(dict(x=b/2, y=y_cont_max+2.5*add, text='y', textangle=0, yanchor='bottom',xanchor='center', **text_props_axes))
-        fig.add_annotation(dict(x=center[0], y=y_cont_max+2.5*add, text='yc', textangle=0, yanchor='bottom',xanchor='center', **text_props_axes))
-        #Добавляем эксцентриситет
-        fig.add_annotation(x=b/2, ax=center[0], y=y_cont_max, ay=y_cont_max, **arrows_props)
-        fig.add_annotation(x=center[0], ax=b/2, y=y_cont_max, ay=y_cont_max, **arrows_props)
-        fig.add_annotation(dict(x=(center[0]+b/2)/2, y=y_cont_max+0.05*add, text=f'{float(round(abs(center[0]-b/2),2)):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-    else:
-        fig.add_annotation(dict(x=center[0], y=y_cont_max+2.5*add, text='y, yc', textangle=0, yanchor='bottom',xanchor='center', **text_props_axes))
-
-    #Расстояние до наиболее удаленных точек
-    #Вдоль оси x (подписи сверху)
-    fig.add_annotation(x=x_cont_min, ax=center[0], y=y_cont_max+add, ay=y_cont_max+add, **arrows_props)
-    fig.add_annotation(x=center[0], ax=x_cont_min, y=y_cont_max+add, ay=y_cont_max+add, **arrows_props)
-    fig.add_trace(go.Scatter(x=[x_cont_min, x_cont_min], y=[y_cont_max, y_cont_max+1.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=(x_cont_min+center[0])/2, y=(y_cont_max+1.05*add), text=f'{float(round(abs((x_cont_min-center[0])),2)):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-    fig.add_annotation(x=x_cont_max, ax=center[0], y=y_cont_max+add, ay=y_cont_max+add, **arrows_props)
-    fig.add_annotation(x=center[0], ax=x_cont_max, y=y_cont_max+add, ay=y_cont_max+add, **arrows_props)
-    fig.add_trace(go.Scatter(x=[x_cont_max, x_cont_max], y=[y_cont_max, y_cont_max+1.1*add], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=(x_cont_max+center[0])/2, y=(y_cont_max+1.05*add), text=f'{float(round(abs((x_cont_max-center[0])),2)):g}', textangle=0, yanchor='bottom',xanchor='center', **text_props))
-
-    #Вдоль оси y (подписи справа)
-    fig.add_annotation(x=x_cont_max+add, ax=x_cont_max+add, y=y_cont_max, ay=center[1], **arrows_props)
-    fig.add_annotation(x=x_cont_max+add, ax=x_cont_max+add, y=center[1], ay=y_cont_max, **arrows_props)
-    fig.add_trace(go.Scatter(x=[x_cont_max, x_cont_max+1.1*add], y=[y_cont_max, y_cont_max], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=(x_cont_max+0.95*add), y=(y_cont_max+center[1])/2, text=f'{float(round(abs(y_cont_max-center[1]),2)):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-    fig.add_annotation(x=x_cont_max+add, ax=x_cont_max+add, y=y_cont_min, ay=center[1], **arrows_props)
-    fig.add_annotation(x=x_cont_max+add, ax=x_cont_max+add, y=center[1], ay=y_cont_min, **arrows_props)
-    fig.add_trace(go.Scatter(x=[x_cont_max, x_cont_max+1.1*add], y=[y_cont_min, y_cont_min], showlegend=False, mode='lines', line=dict(color='black', width=0.5)))
-    fig.add_annotation(dict(x=(x_cont_max+0.95*add), y=(y_cont_min+center[1])/2, text=f'{float(round(abs(y_cont_min-center[1]),2)):g}', textangle=270, yanchor='middle',xanchor='right', **text_props))
-
-    
-    fig.add_trace(go.Scatter(x=[center[0]], y=[center[1]], showlegend=False, mode="markers", marker_symbol=4, marker_size=15, line=dict(color='green')))
-    fig.update_yaxes(scaleanchor="x",scaleratio=1,title="y")
-    fig.update_xaxes(dict(title="x", visible=False))
-    fig.update_yaxes(visible=False)
-    #autosize=True,
-    fig.update_layout(margin={'l': 0, 'r': 0, 't': 0, 'b': 0})
-    fig.update_layout(height=400, width=400)
-    file_stream = io.BytesIO()
-    file_stream2 = 0
-    fig.write_image(file_stream, format='png', width=400, height=400, scale=8)
-##    fig.write_image(file_stream2, format='svg', width=400, height=400, scale=8)
-##    fig.write_image('test.svg', format='svg', width=400, height=400, scale=8)
-    return fig, file_stream, file_stream2
-
-with st.expander('Описание исходных данных'):
-    st.write('$b$ и $h$ – ширина и высота поперечного сечения сечения колонны, см;')
-    st.write('$h_0$ – приведенная рабочая высота поперечного сечения плиты, см;')
-    st.write('$c_L$ и $c_R$ – расстояние в свету до левой и правой грани плиты от грани колонны, см. Вводится если левая или правая граница контура отключена;')
-    st.write('$c_B$ и $c_T$ – расстояние в свету до нижней и верхней грани плиты от грани колонны, см. Вводится если верхняя или нижняя граница контура отключена;')
-    st.write('$R_{bt}$ – расчетное сопротивление на растяжение бетона, МПа;')
-    st.write('''$\\gamma_{bt}$ – коэффициент, вводимый к расчетному сопротивлению бетона на растяжение.
-    Например, в соответствии с п. 6.1.12 (а) СП 63.13330.2018 при продолжительном действии нагрузки величина данного коэффициента принимается равной 0.9;''')
-    st.write('$R_{sw}$ – расчетное сопротивление поперечного армирования, МПа;')
-    st.write('$n_{sw}$ – число стержней поперечного армирования в одном ряду, пересекающих пирамиду продавливания, шт.;')
-    st.write('$s_{w}$ – шаг рядов поперечного армирования вдоль расчетного контура, мм;')
-    st.write('$d_{sw}$ – диаметр поперечного армирования, мм;')
-    st.write('$k_{sw}, %$ – вклад поперечного армирования в несущую способность в процентах от максимально допустимого;')
-    st.write('''$F$ – сосредоточенная продавливающая сила, тс.
-    Значение сосредоточенной силы следует принимать за вычетом сил, действующих в пределах основания
-    пирамиды продавливания в противоположном направлении; ''')
-    st.write('$M_{x,loc}$ – сосредоточенный момент в месте приложения сосредоточенной нагрузки в ПЛОСКОСТИ оси $x$ (относительно оси $y$), тсм. Положительное значение "сжимает" правую грань расчетного контура (см. "положительные направления нагрузок");')
-    st.write('$M_{y,loc}$ – сосредоточенный момент в месте приложения сосредоточенной нагрузки в ПЛОСКОСТИ оси $y$ (относительно оси $x$), тсм. Положительное значение "сжимает" верхнюю грань расчетного контура (см. "положительные направления нагрузок");')
-    st.write('$\\delta_{Mx}$ – понижающий коэффициент к моментам в плоскости оси $x$;')
-    st.write('$\\delta_{My}$ – понижающий коэффициент к моментам в плоскости оси $y$;')
-    st.write('''Параметр "учитывать знак $F \\cdot e$".
-    Если данный параметр включен, то момент от внецентренного приложения сосредоточенной силы,
-    в зависимости от величины эксцентриситета, может догружать или разгружать расчетный контур.
-    В противном случае момент от эксцентриситета всегда догружает расчетный контур;''')
-    st.write('''Параметр "направление $F$". Данный параметр влияет на результаты расчета, только если активирован параметр "учитывать знак $F \\cdot e$". При положительном
-    значении эксцентриситета и силе направленной вверх, момент от эксцентриситета $F \\cdot e$ будет положительным.
-    Если сила направлена вниз – отрицательным. Более наглядно этот факт понятен из рисунка "положительные направления нагрузок";''')
-    st.write('''Параметр "$\\delta_{M}$ для $F \\cdot e$". Данный параметр указывает, учитывать ли понижающие коэффициенты $\\delta_{M}$ для моментов от эксцентриситета.
-    В соответствии с п. 8.1.46 указания по снижению момента представлены только в абзаце, содержащем $M_{loc}$.''')
 
 if True: #Ввод исходных данных
     cols = st.columns([1, 0.5])
     cols2_size = [1, 1, 1]
     cols2 = cols[1].columns(cols2_size)
-    ##cols2 = cols[1].columns(cols2_size)
-    ##cols2 = cols[1].columns(cols2_size)
-    ##cols2 = cols[1].columns(cols2_size)
-    ##cols2 = cols[1].columns(cols2_size)
     cols2[0].write('$b$, см')
     b = cols2[1].number_input(label='$b$, см', step=5.0, format="%.1f", value=20.0, min_value=1.0, max_value=500.0, label_visibility="collapsed")
     b = round(b,2)
@@ -588,31 +360,30 @@ if True: #Ввод исходных данных
     cols2 = cols[1].columns(cols2_size)
     cols2[0].write('$c_L$, см')
     is_cL = cols2[2].toggle('Контур_слева', value=True, label_visibility="collapsed")
-    cL = cols2[1].number_input(label='$c_L$, см', step=5.0, format="%.1f", value=10.0, disabled=is_cL, min_value=0.0, max_value=500.0, label_visibility="collapsed")
+    cL = cols2[1].number_input(label='$c_L$, см', step=5.0, format="%.1f", value=0.0, disabled=is_cL, min_value=0.0, max_value=500.0, label_visibility="collapsed")
     cL = round(cL,2)
 
 
     cols2 = cols[1].columns(cols2_size)
     cols2[0].write('$c_R$, см')
     is_cR = cols2[2].toggle('Контур_справа', value=True, label_visibility="collapsed")
-    cR = cols2[1].number_input(label='$c_R$, см', step=5.0, format="%.1f", value=10.0, disabled=is_cR, min_value=0.0, max_value=500.0, label_visibility="collapsed")
+    cR = cols2[1].number_input(label='$c_R$, см', step=5.0, format="%.1f", value=0.0, disabled=is_cR, min_value=0.0, max_value=500.0, label_visibility="collapsed")
     cR = round(cR,2)
 
 
     cols2 = cols[1].columns(cols2_size)
     cols2[0].write('$c_B$, см')
     is_cB = cols2[2].toggle('Контур_снизу', value=True, label_visibility="collapsed")
-    cB = cols2[1].number_input(label='$c_B$, см', step=5.0, format="%.1f", value=10.0, disabled=is_cB, min_value=0.0, max_value=500.0, label_visibility="collapsed")
+    cB = cols2[1].number_input(label='$c_B$, см', step=5.0, format="%.1f", value=0.0, disabled=is_cB, min_value=0.0, max_value=500.0, label_visibility="collapsed")
     cB = round(cB,2)
 
 
     cols2 = cols[1].columns(cols2_size)
     cols2[0].write('$c_T$, см')
     is_cT = cols2[2].toggle('Контур_сверху', value=True, label_visibility="collapsed")
-    cT = cols2[1].number_input(label='$c_T$, см', step=5.0, format="%.1f", value=10.0, disabled=is_cT, min_value=0.0, max_value=500.0, label_visibility="collapsed")
+    cT = cols2[1].number_input(label='$c_T$, см', step=5.0, format="%.1f", value=0.0, disabled=is_cT, min_value=0.0, max_value=500.0, label_visibility="collapsed")
     cT = round(cT,2)
 
-    ##cols3 = st.columns([1, 0.5])
     cols2 = st.columns([1,0.6,0.6,0.7,0.7,0.7,0.5,0.5])
     ctype = cols2[0].selectbox(label='Бетон', options=available_concretes, index=5, label_visibility="visible")
     selected_concrete_data = table_concretes_data.loc[table_concretes_data['Class'] == ctype]
@@ -626,8 +397,6 @@ if True: #Ввод исходных данных
     RbtMPA = round(RbtMPA,4)
     Rbt = 0.01019716213*RbtMPA
     Rbt = round(Rbt,5)
-    #st.write(Rbt)
-    #Rbt = 0.01*Rbt
     F = cols2[3].number_input(label='$F$, тс', step=1.0, format="%.1f", value=49.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
     Mxloc = cols2[4].number_input(label='$M_{x,loc}$, тсм', step=0.5, format="%.2f", value=4.0, label_visibility="visible")
     Myloc = cols2[5].number_input(label='$M_{y,loc}$, тсм', step=0.5, format="%.2f", value=7.0, label_visibility="visible")
@@ -647,7 +416,7 @@ if True: #Ввод исходных данных
         image_f_dir = Image.open("F_down.png")
     st.sidebar.write("Положительные направления нагрузок")
     st.sidebar.image(image_f_dir)
-    is_sw = cols2[0].selectbox(label='Поперечное арм.', options=['да', 'нет'], index=1, label_visibility="visible")
+    is_sw = cols2[0].selectbox(label='Поперечное арм.', options=['да', 'нет'], index=0, label_visibility="visible")
     if is_sw == 'да': is_sw=True
     else: is_sw=False
     sw_mode = cols2[1].selectbox(label='Режим арм.', options=['подбор','проверка'], index=0, label_visibility="visible")
@@ -657,7 +426,6 @@ if True: #Ввод исходных данных
 
     if is_sw:
         cols2 = st.columns([1,0.8,1,1,1,1,1])
-        
         rtype = cols2[0].selectbox(label='Арматура', options=['A240', 'A400', 'A500'], index=0, label_visibility="visible")
         selected_reinf_data = table_reinf_data.loc[table_reinf_data['Class'] == rtype]
         selected_reinf_data = selected_reinf_data.to_dict('records')[0]
@@ -665,11 +433,11 @@ if True: #Ввод исходных данных
         Rsw = cols2[1].number_input(label='$R_{sw}$, МПа', value=Rsw0, label_visibility="visible", disabled=True)
         Rsw = 0.01019716213*Rsw
         Rsw = round(Rsw,3)
-        nsw = cols2[2].number_input(label='$n_{sw}$, шт.', step=1, format="%i", value=2, min_value=1, max_value=10, label_visibility="visible", disabled=sw_block)
+        nsw = cols2[3].number_input(label='$n_{sw}$, шт.', step=1, format="%i", value=2, min_value=1, max_value=10, label_visibility="visible")
         nsw = round(nsw)
-        sw = cols2[3].number_input(label='$s_w$, см', step=5.0, format="%.2f", value=6.0, min_value=0.0, max_value=100.0, label_visibility="visible", disabled=sw_block)
+        sw = cols2[5].number_input(label='$s_w$, см', step=5.0, format="%.2f", value=6.0, min_value=0.0, max_value=100.0, label_visibility="visible", disabled=sw_block)
         sw = round(sw,2)
-        dsw = cols2[4].selectbox(label='$d_{sw}$, мм', options=dias, index=0, label_visibility="visible", disabled=sw_block)
+        dsw = cols2[4].selectbox(label='$d_{sw}$, мм', options=dias, index=0, label_visibility="visible")
         dsw = round(dsw)
         Asw = pi*dsw*dsw/4*nsw/10/10
         Asw= round(Asw,3)
@@ -682,9 +450,8 @@ if True: #Ввод исходных данных
         #st.write(qsw_max)
         ksw0 = 0.8*qsw0/(Rbt*h0)
         ksw0 = round(ksw0,3)
-        if sw_mode == 'проверка':
-            cols2[6].number_input(label='$k_{sw}$, %', step=5.0, format="%.1f", value=ksw0*100, label_visibility="visible", disabled=True)
-        kh0 = cols2[5].number_input(label='$k \\cdot h_0$', step=0.1, format="%.1f", value=1.5, label_visibility="visible")
+        cols2[6].number_input(label='$k_{sw}$, %', step=5.0, format="%.1f", value=ksw0*100, label_visibility="visible", disabled=True)
+        kh0 = cols2[2].number_input(label='$k \\cdot h_0$', step=0.1, format="%.1f", value=1.5, label_visibility="visible")
         ksw = 0.0
         if ksw0<0.25:
             ksw = 0.0
@@ -755,7 +522,6 @@ doc.add_paragraph().add_run(string)
 
 
 
-from init_help import init_help
 
 if is_init_help:
     init_help(doc, is_sw, M_abs, delta_M_exc, F_dir)
@@ -770,10 +536,10 @@ with st.expander('Исходные данные'):
     doc.add_heading(string, level=2)
     st.subheader(string)
 
-    string = 'Ширина зоны передачи нагрузки $b=' + str(round(b,2)) + '\\cdot см$.'
+    string = 'Ширина колонны $b=' + str(round(b,2)) + '\\cdot см$.'
     st.write(string)
     add_text_latex(doc.add_paragraph(), string)
-    string = 'Высота зоны передачи нагрузки $h=' + str(round(h,2)) + '\\cdot см$.'
+    string = 'Высота колонны $h=' + str(round(h,2)) + '\\cdot см$.'
     st.write(string)
     add_text_latex(doc.add_paragraph(), string)
     string = 'Приведенная рабочая высота сечения плиты $h_0=' + str(round(h0,2)) + '\\cdot см$.'
@@ -796,10 +562,7 @@ with st.expander('Исходные данные'):
     p.paragraph_format.first_line_indent = Mm(0)
     p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    string = 'Сосредоточенная сила $F=' + str(F) + '\\cdot тс$.'
-    st.write(string)
-    add_text_latex(doc.add_paragraph(), string)
-    string = 'Направление действия силы $F$ – ' + F_dir + '.'
+    string = 'Сосредоточенная сила $F=' + str(F) + '\\cdot тс$, направленная ' + F_dir + '.'
     st.write(string)
     add_text_latex(doc.add_paragraph(), string)
     string = 'Изгибающий момент в плоскости оси $x$ в месте приложения силы $M_{x,loc}=' + str(Mxloc) + '\\cdot тсм$.'
@@ -828,16 +591,10 @@ with st.expander('Исходные данные'):
     string = 'Материалы.'
     doc.add_heading(string, level=2)
     st.subheader(string)
-    string = 'Класс бетона по прочности на сжатие ' + str(ctype) + '.'
-    st.write(string)
-    add_text_latex(doc.add_paragraph(), string)
-    string = 'Расчетное сопротивление бетона на растяжение $R_{bt}=' + str(Rbt0) + '\\cdot МПа$.'
-    st.write(string)
-    add_text_latex(doc.add_paragraph(), string)
-    string = 'Коэффициент, вводимый к расчетному сопротивлению бетона на растяжение $\\gamma_{bt}=' + str(gammabt) + '$.'
-    st.write(string)
-    add_text_latex(doc.add_paragraph(), string)
-    string = 'Расчетное сопротивление бетона на растяжение, учитываемое в расчете:'
+    string = 'Класс бетона по прочности на сжатие ' + str(ctype) + ', '
+    string += '$R_{bt}=' + str(Rbt0) + '\\cdot МПа$, '
+    string += '$\\gamma_{bt}=' + str(gammabt) + '$.'
+    string += ' Расчетное сопротивление бетона на растяжение, учитываемое в расчете:'
     st.write(string)
     add_text_latex(doc.add_paragraph(), string)
     string =  '$R_{bt}=R_{bt} \\cdot \\gamma_{bt} = ' + str(Rbt0) + '\\cdot' + str(gammabt)
@@ -846,43 +603,40 @@ with st.expander('Исходные данные'):
     string += '.$'
     st.write(string)
     add_text_latex(doc.add_paragraph(), string)
-    if is_sw:
-        string = 'Класс поперечной арматуры ' + str(rtype) + '.'
-        st.write(string)
-        add_text_latex(doc.add_paragraph(), string)
-        string = 'Расчетное сопротивление поперечной арматуры, учитываемое в расчете:'
-        st.write(string)
-        add_text_latex(doc.add_paragraph(), string)
 
+    if is_sw:
+        string = 'Класс поперечной арматуры ' + str(rtype) + '. '
+        string += 'Расчетное сопротивление поперечной арматуры, учитываемое в расчете:'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
         string =  '$R_{sw}= ' + str(Rsw0) +  '\\cdot МПа='
         string += str(Rsw) + '\\cdot тс/см^2'
         string += '.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
-    
-    if is_sw:
+        string = 'Параметры поперечного армирования.'
+        doc.add_heading(string, level=2)
+        st.subheader(string)
+        string = 'Диаметр стержней поперечного армирования ' + '$d_{sw}=' + str(dsw) + '\\cdot мм$.'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        string = 'Число стержней в одном ряду, пересекающих пирамиду продавливания ' + '$n_{sw}='  + str(nsw) + ' шт$.'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        string = 'Площадь стержней поперечного армирования одного ряда, пересекающих пирамиду продавливания:'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        string = '$A_{sw} = \\dfrac{\\pi \\cdot d_{sw}^2 \\cdot n_{sw}}{4} = '
+        string += '\\dfrac{\\pi \\cdot ' + str(dsw) + '^2 \\cdot' + str(nsw) + '}{4 \\cdot 100} =' 
+        string += str(Asw) + '\\cdot см^2.$'
+        st.write(string)
+        add_text_latex(doc.add_paragraph(), string)
+        #string = 'Примечание. Деление на 100 в данной формуле необходимо для перевода $мм^2$ в $см^2$.'
+        #st.write(string)
+        #add_text_latex(doc.add_paragraph(), string)
+
         if sw_mode == 'проверка':
-            string = 'Параметры заданного поперечного армирования.'
-            doc.add_heading(string, level=2)
-            st.subheader(string)
-            string = 'Число стержней в одном ряду, пересекающих пирамиду продавливания ' + '$n_{sw}='  + str(nsw) + 'шт$.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
             string = 'Шаг рядов поперечного армирования вдоль расчетного контура ' + '$s_{w}='  +  str(sw) + '\\cdot см$.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = 'Диаметр стержней поперечного армирования ' + '$d_{sw}=' + str(dsw) + '\\cdot мм$.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = 'Площадь стержней поперечного армирования одного ряда, пересекающих пирамиду продавливания:'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = '$A_{sw} = \\dfrac{\\pi \\cdot d_{sw}^2 \\cdot n_{sw}}{4} = '
-            string += '\\dfrac{\\pi \\cdot ' + str(dsw) + '^2 \\cdot' + str(nsw) + '}{4 \\cdot 100} =' 
-            string += str(Asw) + '\\cdot см^2.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = 'Примечание. Деление на 100 в данной формуле необходимо для перевода $мм^2$ в $см^2$.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = 'Усилие в поперечной арматуре на единицу длины контура расчетного поперечного сечения:'
@@ -917,9 +671,9 @@ with st.expander('Исходные данные'):
             #    st.write(string)
             #    add_text_latex(doc.add_paragraph(), string)
 
-        string = 'Примечание. Поперечная арматура принимается равномерно расположенной по периметру расчетного контура.'
-        st.write(string)
-        add_text_latex(doc.add_paragraph(), string)
+        #string = 'Примечание. Поперечная арматура принимается равномерно расположенной по периметру расчетного контура.'
+        #st.write(string)
+        #add_text_latex(doc.add_paragraph(), string)
 
 if True: #Добавление эскиза расчетного контура в docx
     string = 'Эскиз расчетного контура.'

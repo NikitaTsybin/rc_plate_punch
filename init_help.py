@@ -6,53 +6,41 @@ from docx.oxml import parse_xml
 from docx.shared import Mm
 from docx.shared import RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from word_func import *
 
-def _formula(latex_string: str) -> typing.Any:
-    mathml_output = latex2mathml.converter.convert(latex_string)
-    omml_output = mathml2omml.convert(mathml_output)
-    xml_output = (
-        f'<p xmlns:m="http://schemas.openxmlformats.org/officeDocument'
-        f'/2006/math">{omml_output}</p>'
-    )
-    return parse_xml(xml_output)[0]
 
-def add_math(p, latex_string) -> None:
-    p._p.append(_formula(latex_string))
 
-def divide_latex(string):
-    string_text, string_latex = [[]], [[]]
-    if string[0] == '$': cursor = 1
-    else: cursor = -1
-    if cursor == 1 and string[0] != '$':
-        string_latex[-1].append(string[0])
-    else: string_text[-1].append(string[0])
-    for i in range(1, len(string)):
-        if string[i] == '$':
-            cursor = cursor*(-1)
-            string_latex.append([])
-            string_text.append([])
-        if cursor == 1 and string[i] != '$':
-            string_latex[-1].append(string[i])
-            string_text[-1] = 'NONE'
-        if cursor == -1 and string[i] != '$':
-            string_text[-1].append(string[i])
-            string_latex[-1] = 'NONE'
-    for i in range(len(string_text)):
-        temp = ''
-        for j in string_text[i]: temp += j
-        string_text[i] = temp
-    for i in range(len(string_latex)):
-        temp = ''
-        for j in string_latex[i]: temp += j
-        string_latex[i] = temp
-    return string_text, string_latex
+def init_data():
+    with st.expander('Пояснения для исходных данных'):
+        st.write('$b$ и $h$ – ширина и высота поперечного сечения сечения колонны, см;')
+        st.write('$h_0$ – приведенная рабочая высота поперечного сечения плиты, см;')
+        st.write('$c_L$ и $c_R$ – расстояние в свету до левой и правой грани плиты от грани колонны, см. Вводится если левая или правая граница контура отключена;')
+        st.write('$c_B$ и $c_T$ – расстояние в свету до нижней и верхней грани плиты от грани колонны, см. Вводится если верхняя или нижняя граница контура отключена;')
+        st.write('$R_{bt}$ – расчетное сопротивление на растяжение бетона, МПа;')
+        st.write('''$\\gamma_{bt}$ – коэффициент, вводимый к расчетному сопротивлению бетона на растяжение.
+        Например, в соответствии с п. 6.1.12 (а) СП 63.13330.2018 при продолжительном действии нагрузки величина данного коэффициента принимается равной 0.9;''')
+        st.write('$R_{sw}$ – расчетное сопротивление поперечного армирования, МПа;')
+        st.write('$n_{sw}$ – число стержней поперечного армирования в одном ряду, пересекающих пирамиду продавливания, шт.;')
+        st.write('$s_{w}$ – шаг рядов поперечного армирования вдоль расчетного контура, мм;')
+        st.write('$d_{sw}$ – диаметр поперечного армирования, мм;')
+        st.write('$k_{sw}, %$ – вклад поперечного армирования в несущую способность в процентах от максимально допустимого;')
+        st.write('''$F$ – сосредоточенная продавливающая сила, тс.
+        Значение сосредоточенной силы следует принимать за вычетом сил, действующих в пределах основания
+        пирамиды продавливания в противоположном направлении; ''')
+        st.write('$M_{x,loc}$ – сосредоточенный момент в месте приложения сосредоточенной нагрузки в ПЛОСКОСТИ оси $x$ (относительно оси $y$), тсм. Положительное значение "сжимает" правую грань расчетного контура (см. "положительные направления нагрузок");')
+        st.write('$M_{y,loc}$ – сосредоточенный момент в месте приложения сосредоточенной нагрузки в ПЛОСКОСТИ оси $y$ (относительно оси $x$), тсм. Положительное значение "сжимает" верхнюю грань расчетного контура (см. "положительные направления нагрузок");')
+        st.write('$\\delta_{Mx}$ – понижающий коэффициент к моментам в плоскости оси $x$;')
+        st.write('$\\delta_{My}$ – понижающий коэффициент к моментам в плоскости оси $y$;')
+        st.write('''Параметр "учитывать знак $F \\cdot e$".
+        Если данный параметр включен, то момент от внецентренного приложения сосредоточенной силы,
+        в зависимости от величины эксцентриситета, может догружать или разгружать расчетный контур.
+        В противном случае момент от эксцентриситета всегда догружает расчетный контур;''')
+        st.write('''Параметр "направление $F$". Данный параметр влияет на результаты расчета, только если активирован параметр "учитывать знак $F \\cdot e$". При положительном
+        значении эксцентриситета и силе направленной вверх, момент от эксцентриситета $F \\cdot e$ будет положительным.
+        Если сила направлена вниз – отрицательным. Более наглядно этот факт понятен из рисунка "положительные направления нагрузок";''')
+        st.write('''Параметр "$\\delta_{M}$ для $F \\cdot e$". Данный параметр указывает, учитывать ли понижающие коэффициенты $\\delta_{M}$ для моментов от эксцентриситета.
+        В соответствии с п. 8.1.46 указания по снижению момента представлены только в абзаце, содержащем $M_{loc}$.''')
 
-def add_text_latex (p, string):
-    string_text, string_latex = divide_latex(string)
-    for i in range(len(string_text)):
-        if string_text[i] != 'NONE':
-            p.add_run(string_text[i])
-        else: add_math(p, string_latex[i])
 
 def init_help(doc, is_sw, M_abs, delta_M_exc, F_dir):
     with st.expander('Расчетные предпосылки'):
