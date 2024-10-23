@@ -24,6 +24,7 @@ import sys
 from punch_word_func import *
 from punch_draw_func import *
 from punch_text_func import *
+from punch_solve_func import *
 
 dias = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25]
 qsw = 0.0
@@ -49,13 +50,6 @@ available_concretes = table_concretes_data['Class'].to_list()
 init_data_help()
 
 
-def solve_sw_min(kb, h0, Rbt, Rsw, Asw):
-    if kb<1.25: kb = 1.25
-    sw_min = 0.8*Rsw*Asw/(Rbt*h0*(kb-1))
-    sw_min = sw_min/0.5
-    sw_min = floor(sw_min)
-    sw_min = round(sw_min*0.5,1)
-    return sw_min
 
 
 def solve_arm (Asw_sw, h0, Lx, Ly):
@@ -474,7 +468,7 @@ if True: #Ввод исходных данных
             qsw = qsw0
         ksw = round(ksw,3)
     
-
+if True: #Генерация контуров
     red_contours = generate_red_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
     blue_contours, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr = generate_blue_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
     red_contours_sw = generate_red_contours(b, h, 2*kh0*h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
@@ -500,8 +494,12 @@ if True: #Ввод исходных данных
 
 if num_elem>=2:
     rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
+    #rez2 = solve_geom_props(blue_contours)
+    #colls = st.columns([1,1])
+    #colls[0].write(rez)
+    #colls[1].write(rez2)
     if sw_mode == 'подбор':
-        sw_min = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw)
+        sw_min, sw_min_code = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw, dx, dy)
         qsw = round(Rsw*Asw/sw_min,5)
         rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
     rez_sw = find_contour_geometry(blue_contours_sw, contour_gamma_sw, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
@@ -545,8 +543,10 @@ if True: #Быстрый вывод основных результатов
     if is_sw:
         if 2>= rez['kb'] > 1:
             if sw_mode == 'подбор':
-                sw_min = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw)
-                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(Asw) + 'см^2$, составляет $s_w = ' + str(sw_min) + '\\cdot см$.'
+                sw_min, sw_min_code = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw, dx, dy)
+                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$, составляет $s_w = ' + str(sw_min) + '\\cdot см$.'
+                if sw_min_code == 1:
+                    string += ' :blue[Учтено ограничение на максимальный шаг.]'
                 string += ' При данном шаге $q_{sw} = ' + str(qsw) + '\\cdot тс/см$.'
                 st.write(string)
         if 2>= rez['kb'] > 1:
