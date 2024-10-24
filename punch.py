@@ -26,14 +26,28 @@ from punch_draw_func import *
 from punch_text_func import *
 from punch_solve_func import *
 
+#height_hack = '''
+#<script>
+#    var hide_me_list = window.parent.document.querySelectorAll('iframe');
+#    for (let i = 0; i < hide_me_list.length; i++) { 
+#        if (hide_me_list[i].height == 0) {
+#            hide_me_list[i].parentNode.style.height = 0;
+#            hide_me_list[i].parentNode.style.marginBottom = '-1rem';
+#        };
+#    };
+#</script>
+#'''
+#st.components.v1.html(height_hack, height=0)
+
 dias = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25]
-qsw = 0.0
-qsw0 = 0.0
 Rsw = 1.734
 sw = 6.0
 nsw = 2
-center = [25.0, 50.0]
+Asw = 0.565
+qsw = round(Asw*Rsw/sw, 5)
+qsw0 = round(Asw*Rsw/sw, 5)
 kh0 = 1.5
+center = [25.0, 50.0]
 
 st.header('Расчет на продавливание плиты')
 
@@ -49,126 +63,7 @@ available_concretes = table_concretes_data['Class'].to_list()
 
 init_data_help()
 
-def solve_arm (Asw_sw, h0, Lx, Ly):
-    nswmin = 1
-    nswmax = round(h0/5)
-    if nswmax>10: nswmax = 10
-    if nswmax < 3: nswmax = 3
-    nsw_arr = [round(nswmin + i) for i in range(nswmax-nswmin+1)]
-    sw_min = 5
-    sw_max = min(Lx/4, Ly/4)
-    sw_num = 6
-    sw_step = round((sw_max-sw_min)/sw_num,2)
-    sw_arr = [round(sw_min + i*sw_step,1) for i in range(sw_num+1)]
-    dsw_arr = [[] for i in range(len(nsw_arr))]
-    for i in range(len(nsw_arr)):
-        for j in range(len(sw_arr)):
-            tmp = round((Asw_sw*sw_arr[j]*4/(nsw_arr[i]*pi))**0.5*10,2)
-            if tmp>25: tmp = '-'
-            dsw_arr[i].append(tmp)
-    return nsw_arr, sw_arr, dsw_arr
 
-
-
-def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
-    contour = []
-    cL0 = round(max(min(cL,h0), h0),1)
-    cR0 = round(max(min(cR,h0), h0),1)
-    cT0 = round(max(min(cT,h0), h0),1)
-    cB0 = round(max(min(cB,h0), h0),1)
-    contour_gamma = []
-    contour_colour = []
-    contour_sides = []
-    contour_len = []
-    contour_len_pr = []
-    contour_center = []
-    if is_cL:
-        contour_x = [round(-cL0/2, 2), round(-cL0/2, 2)]
-        contour_y = [round(-cB0/2, 2), round(h+cT0/2, 2)]
-        if not is_cT: contour_y[1] = round(h+cT, 2)
-        if not is_cB: contour_y[0] = round(-cB, 2)
-        contour_gamma.append(round(h0/cL0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('левый')
-        L = round(((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5,2)
-        contour_len.append(L)
-        contour_xc = round(contour_x[0],2)
-        contour_yc = round(contour_y[0] + 0.5*L,2)
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-    if is_cR:
-        contour_x = [b+cR0/2, b+cR0/2]
-        contour_y = [-cB0/2, h+cT0/2]
-        if not is_cT: contour_y[1] = h+cT
-        if not is_cB: contour_y[0] = -cB
-        contour_gamma.append(round(h0/cR0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('правый')
-        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
-        contour_len.append(L)
-        contour_xc = contour_x[0]
-        contour_yc = contour_y[0] + 0.5*L
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-    if is_cB:
-        contour_x = [-cL0/2, b+cR0/2]
-        contour_y = [-cB0/2, -cB0/2]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        contour_gamma.append(round(h0/cB0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('нижний')
-        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
-        contour_len.append(L)
-        contour_yc = contour_y[0]
-        contour_xc = contour_x[0] + 0.5*L
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-    if is_cT:
-        contour_x = [-cL0/2, b+cR0/2]
-        contour_y = [h+cT0/2, h+cT0/2]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        contour_gamma.append(round(h0/cT0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('верхний')
-        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
-        contour_len.append(L)
-        contour_yc = contour_y[0]
-        contour_xc = contour_x[0] + 0.5*L
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-        
-    return contour, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr
-
-def generate_red_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
-    add = 0.5*h0
-    bounds = []
-    if not is_cL:
-        contour_x = [-cL, -cL]
-        contour_y = [-add, h+add]
-        if not is_cB: contour_y[0] = -cB
-        if not is_cT: contour_y[1] = h+cT
-        bounds.append([contour_x, contour_y])
-    if not is_cR:
-        contour_x = [b+cR, b+cR]
-        contour_y = [-add, h+add]
-        if not is_cB: contour_y[0] = -cB
-        if not is_cT: contour_y[1] = h+cT
-        bounds.append([contour_x, contour_y])
-    if not is_cB:
-        contour_x = [-add, b+add]
-        contour_y = [-cB, -cB]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        bounds.append([contour_x, contour_y])
-    if not is_cT:
-        contour_x = [-add, b+add]
-        contour_y = [h+cT, h+cT]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        bounds.append([contour_x, contour_y])
-    return bounds
 
 if True: #Ввод исходных данных
     cols = st.columns([1, 0.5])
@@ -215,6 +110,16 @@ if True: #Ввод исходных данных
     cT = cols2[1].number_input(label='$c_T$, см', step=5.0, format="%.1f", value=0.0, disabled=is_cT, min_value=0.0, max_value=500.0, label_visibility="collapsed")
     cT = round(cT,2)
 
+    cols2 = cols[1].columns(cols2_size)
+    cols2[0].write('$q, тс/м^2$')
+    is_q = cols2[2].toggle('Отпор', value=False, label_visibility="collapsed")
+    if is_q == True: dis_q = False
+    else: dis_q = True
+    q = cols2[1].number_input(label='$q, тс/м^2$', step=5.0, format="%.2f", value=1.15, disabled=dis_q, min_value=0.0, max_value=500.0, label_visibility="collapsed")
+    if is_q == True: q = round(q, 2)
+    else: q = 0.0
+    
+
     cols2 = st.columns([1,0.6,0.6,0.7,0.7,0.7,0.5,0.5])
     ctype = cols2[0].selectbox(label='Бетон', options=available_concretes, index=5, label_visibility="visible")
     selected_concrete_data = table_concretes_data.loc[table_concretes_data['Class'] == ctype]
@@ -228,7 +133,7 @@ if True: #Ввод исходных данных
     RbtMPA = round(RbtMPA,4)
     Rbt = 0.01019716213*RbtMPA
     Rbt = round(Rbt,5)
-    F = cols2[3].number_input(label='$F$, тс', step=1.0, format="%.1f", value=49.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
+    F0 = cols2[3].number_input(label='$F$, тс', step=1.0, format="%.1f", value=49.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
     Mxloc = cols2[4].number_input(label='$M_{x,loc}$, тсм', step=0.5, format="%.2f", value=4.0, label_visibility="visible")
     Myloc = cols2[5].number_input(label='$M_{y,loc}$, тсм', step=0.5, format="%.2f", value=7.0, label_visibility="visible")
     deltaMx = cols2[6].number_input(label='$\\delta_{Mx}$', step=0.1, format="%.2f", value=0.5, min_value=0.0, max_value=2.0, label_visibility="visible")
@@ -296,7 +201,28 @@ if True: #Ввод исходных данных
             ksw = ksw0
             qsw = qsw0
         ksw = round(ksw,3)
+
+#Основной расчет (новый)
+if True:
+    solve_data = {'b': b, 'h': h, 'dh0': h0, 'h0': h0,
+                  'is_cL': is_cL, 'is_cR': is_cR, 'is_cB': is_cB, 'is_cT': is_cT,
+                  'cL': cL, 'cR': cR, 'cB': cB, 'cT': cT,
+                  'Rbt': Rbt,
+                  'F0': F0, 'Mxloc': Mxloc, 'Myloc': Myloc, 'deltaMx': deltaMx, 'deltaMy': deltaMy,
+                  'F_dir': F_dir, 'delta_M_exc': delta_M_exc, 'M_abs': M_abs, 'xF': round(b/2,2), 'yF': round(h/2,2), 'q': q,
+                  'Rsw': Rsw, 'Asw': Asw, 'sw': sw, 'kh0': kh0, 'sw_mode': sw_mode}
+    result = single_solve(**solve_data)
+    solve_data_second = solve_data.copy()
+    solve_data_second.update({'dh0': 2*kh0*h0})
+    result_second = single_solve(**solve_data_second)
+    #collls = st.columns([1,1])
+    #collls[0].write(solve_data)
+    #collls[1].write(solve_data_second)
+    #collls[0].write(result)
+    #collls[1].write(result_second)
     
+
+
 if True: #Генерация контуров
     red_contours = generate_red_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
     blue_contours, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr = generate_blue_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
@@ -326,19 +252,21 @@ if True: #Генерация контуров
     sizes_sw = [x_cont_min_sw, x_cont_max_sw, y_cont_min_sw, y_cont_max_sw, dx_sw, dy_sw]
 
 if num_elem>=2:
-    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
+    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F0, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
     #rez2 = solve_geom_props(blue_contours)
     #colls = st.columns([1,1])
     #colls[0].write(rez)
     #colls[1].write(rez2)
     if sw_mode == 'подбор':
-        sw_min, sw_min_code = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw, dx, dy)
+        sw_min, sw_min_code, kb_sw_code = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw, dx, dy)
         qsw = round(Rsw*Asw/sw_min,5)
-        rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
-    rez_sw = find_contour_geometry(blue_contours_sw, contour_gamma_sw, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
+        rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F0, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
+    rez_sw = find_contour_geometry(blue_contours_sw, contour_gamma_sw, Rbt, Rsw, h0, F0, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
     center = [rez['xc'], rez['yc']]
     center_sw = [rez_sw['xc'], rez_sw['yc']]
-    #st.write(rez)
+    #st.write(result['F'], result['Mx'], result['My'])
+    #st.write(F0, rez['Mx'], rez['My'])
+    #st.write(result)
 
 fig, image_stream, image_stream2 = draw_scheme(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
                   red_contours, blue_contours, center, sizes)
@@ -352,39 +280,53 @@ if num_elem<2:
     st.stop()
 
 if True: #Быстрый вывод основных результатов
-    st.write('Предельные усилия, воспринимаемые бетоном контура расчетного поперечного сечения:')
-    string = '$F_{b,ult} = ' + str(rez["Fbult"]) +  '\\cdot тс; '
-    string += '\\quad M_{bx,ult} = ' + str(rez["Mbxult"])+  '\\cdot тсм; '
-    string += '\\quad M_{by,ult} = ' + str(rez["Mbyult"])+  '\\cdot тсм.$'
+    st.write('Предельные усилия, воспринимаемые бетоном:')
+    string = '$F_{b,ult} = ' + str(result["Fbult"]) +  '\\cdot тс; '
+    string += '\\quad M_{bx,ult} = ' + str(result["Mbxult"])+  '\\cdot тсм; '
+    string += '\\quad M_{by,ult} = ' + str(result["Mbyult"])+  '\\cdot тсм.$'
     st.write(string)
     st.write('Коэффициенты использования бетона по силе $k_{b,F}$, по моментам $k_{b,M}$ и суммарный $k_{b}$:')
-    string = '$k_{b,F}='  + str(rez['kbF'])
-    string += '; \\quad k_{b,M}='  + str(rez['kbM'])
-    string += '; \\quad k_{b}='  + str(rez['kb']) + '$.'
-    if rez['kbM0'] != rez['kbM']:
+    string = '$k_{b,F}='  + str(result['kbF'])
+    string += '; \\quad k_{b,M}='  + str(result['kbM'])
+    string += '; \\quad k_{b}='  + str(result['kb']) + '$.'
+    if result['kbM0'] != result['kbM']:
         string += ' :blue[Вклад моментов ограничен.]'
+    if result['kb'] > 2:
+        string += ' :red[Прочность не может быть обеспечена, необходимо увеличение габаритов площадки колонны, толщины плиты или класса бетона.]'
+    if result['kb'] <= 1:
+        string += ' :green[Прочность обеспечена. Поперечное армирование не требуется.]'
+    if 2>= result['kb'] > 1:
+        string += ' :orange[Требуется поперечное армирование.]'
     st.write(string)
-    if rez['kb'] > 2:
-        string = ':red[Прочность не может быть обеспечена, необходимо увеличение габаритов площадки колонны, толщины плиты или класса бетона.]'
-        st.write(string)
-    if rez['kb'] <= 1:
-        string = ':green[Прочность обеспечена. Поперечное армирование не требуется.]'
-        st.write(string)
-    if 2>= rez['kb'] > 1:
-        string = ':orange[Требуется поперечное армирование.]'
-        st.write(string)
     if is_sw:
-        if 2>= rez['kb'] > 1:
+        if 2>= result['kb'] > 1:
             if sw_mode == 'подбор':
-                sw_min, sw_min_code = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw, dx, dy)
-                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$, составляет $s_w = ' + str(sw_min) + '\\cdot см$.'
-                if sw_min_code == 1:
+                sw_min, sw_min_code, kb_sw_code = solve_sw_min(result['kb'], h0, Rbt, Rsw, Asw, dx, dy)
+                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$, составляет $s_w = ' + str(result['sw']) + '\\cdot см$.'
+                if result['sw_min_code'] == 1:
                     string += ' :blue[Учтено ограничение на максимальный шаг.]'
-                string += ' При данном шаге $q_{sw} = ' + str(qsw) + '\\cdot тс/см$.'
+                if result['kb_sw_code'] == 1:
+                    string += ' :blue[Учтено требование $F_{sw,ult} \\ge 0.25 \\cdot F_{b,ult}$.]'
+                string += ' При данном шаге $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
                 st.write(string)
+            st.write('Предельные усилия, воспринимаемые арматурой:')
+            string = '$F_{sw,ult} = ' + str(result["Fswult"]) +  '\\cdot тс; '
+            string += '\\quad M_{sw,x,ult} = ' + str(result["Mswxult"])+  '\\cdot тсм; '
+            string += '\\quad M_{sw,y,ult} = ' + str(result["Mswyult"])+  '\\cdot тсм.$'
+            st.write(string)
+            if result['Fsw_code'] == 1:
+                string = ':blue[Вклад поперечного армирования ограничен несущей способностью бетона]'
+                st.write(string)
+            st.write('Коэффициенты использования по силе $k_F$, по моментам $k_M$ и суммарный $k$:')
+            string = '$k_{F}='  + str(result['kF'])
+            string += '; \\quad k_{M}='  + str(result['kM'])
+            string += '; \\quad k='  + str(result['k']) + '$.'
+            if result['kM0'] != result['kM']:
+                string += ' :blue[Вклад моментов ограничен.]'
+            st.write(string)
         if 2>= rez['kb'] > 1:
-            st.subheader('Проверка за зоной установки поперечной арматуры')
-            string = 'Коэффициенты для расчетного контура на расстоянии $' + str(kh0) + '\\cdot h_0=' + str(round(kh0*h0,1)) +  '\\cdot см$:'
+            string = 'Проверка за зоной установки поперечной арматуры.'
+            string += ' Коэффициенты для расчетного контура на расстоянии $' + str(kh0) + '\\cdot h_0=' + str(round(kh0*h0,1)) +  '\\cdot см$:'
             st.write(string)
             string = '$k_{b,F}='  + str(rez_sw['kbF'])
             string += '; \\quad k_{b,M}='  + str(rez_sw['kbM'])
@@ -398,6 +340,7 @@ if True: #Быстрый вывод основных результатов
             if rez_sw['kb'] > 1:
                 string = ':orange[Требуется увеличение зоны поперечного армирования.]'
                 st.write(string)
+            #st.write(result_second['kbF'], result_second['kbM'], result_second['kb'])
 
 if is_report:
     doc = Document('Template_punch.docx')
@@ -424,7 +367,7 @@ if is_report:
                    ctype, Rbt0, gammabt, RbtMPA, Rbt,
                    is_sw, rtype, Rsw0, Rsw,
                    nsw, dsw, sw, Asw, sw_mode, qsw0, ksw0,
-                   F, F_dir, Mxloc, Myloc,
+                   F0, F_dir, Mxloc, Myloc,
                    delta_M_exc, deltaMx, deltaMy)
 
 
@@ -969,7 +912,7 @@ if is_report:
         string = 'Усилия, учитываемые в расчете.'
         st.subheader(string)
         doc.add_heading(string, level=1)
-        string = 'Сосредоточенная сила, направленная ' + str(F_dir) + ' $F=' + str(F) + '\\cdot тс$.'
+        string = 'Сосредоточенная сила, направленная ' + str(F_dir) + ' $F=' + str(F0) + '\\cdot тс$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
@@ -981,22 +924,22 @@ if is_report:
             if M_abs: #Если считаем момент от эксцентриситета всегда догружающим
                 if delta_M_exc: #Если учитываем дельта к эксцентриситету
                     string = '$M_x = (|M_{x,loc}| + F \\cdot |e_x|) \\cdot \\delta_{Mx} = '
-                    string += '(|' + str(Mxloc) + '| + ' + str(F) + '\\cdot |' + str(rez['ex']) + '/100|) \\cdot ' + str(deltaMx) +  ' =  ' + str(rez['Mx']) 
+                    string += '(|' + str(Mxloc) + '| + ' + str(F0) + '\\cdot |' + str(rez['ex']) + '/100|) \\cdot ' + str(deltaMx) +  ' =  ' + str(rez['Mx']) 
                 else:  #Если не учитываем дельта к эксцентриситету
                     string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} + F \\cdot |e_x|  = '
-                    string += '|' + str(Mxloc) + '| \\cdot'  + str(deltaMx) + ' + ' + str(F) + '\\cdot |' + str(rez['ex']) + '/100| '  ' =  ' + str(rez['Mx']) 
+                    string += '|' + str(Mxloc) + '| \\cdot'  + str(deltaMx) + ' + ' + str(F0) + '\\cdot |' + str(rez['ex']) + '/100| '  ' =  ' + str(rez['Mx']) 
             else: #Если учитываем знаки моментов
                 if F_dir == 'вверх': znak = '+'
                 if F_dir == 'вниз': znak = '-'
                 if delta_M_exc: #Если учитываем дельта к эксцентриситету
                     string = '$M_x = |M_{x,loc}' + znak +  'F \\cdot e_x| \\cdot \\delta_{Mx} = '
-                    string += '|' + str(Mxloc) + znak + str(F) + '\\cdot ' 
+                    string += '|' + str(Mxloc) + znak + str(F0) + '\\cdot ' 
                     if rez['ex'] <0: string += '(' +  str(rez['ex'])  + ')'
                     else: string += str(rez['ex'])
                     string += '/100| \\cdot ' + str(deltaMx) +  ' =  ' + str(rez['Mx']) 
                 else:  #Если не учитываем дельта к эксцентриситету
                     string = '$M_x = |M_{x,loc} \\cdot \\delta_{Mx}' + znak +  'F \\cdot e_x|  = '
-                    string += '|' + str(Mxloc) + ' \\cdot'  + str(deltaMx) + znak + str(F) + '\\cdot '
+                    string += '|' + str(Mxloc) + ' \\cdot'  + str(deltaMx) + znak + str(F0) + '\\cdot '
                     if rez['ex'] <0: string += '(' +  str(rez['ex'])  + ')'
                     else: string += str(rez['ex'])
                     string +=  '/100| '  ' =  ' + str(rez['Mx']) 
@@ -1008,22 +951,22 @@ if is_report:
             if M_abs: #Если считаем момент от эксцентриситета всегда догружающим
                 if delta_M_exc: #Если учитываем дельта к эксцентриситету
                     string = '$M_y = (|M_{y,loc}| + F \\cdot |e_y|) \\cdot \\delta_{My} = '
-                    string += '(|' + str(Myloc) + '| + ' + str(F) + '\\cdot |' + str(rez['ey']) + '/100|) \\cdot ' + str(deltaMy) +  ' =  ' + str(rez['My']) 
+                    string += '(|' + str(Myloc) + '| + ' + str(F0) + '\\cdot |' + str(rez['ey']) + '/100|) \\cdot ' + str(deltaMy) +  ' =  ' + str(rez['My']) 
                 else:  #Если не учитываем дельта к эксцентриситету
                     string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} + F \\cdot |e_y|  = '
-                    string += '|' + str(Myloc) + '| \\cdot'  + str(deltaMy) + ' + ' + str(F) + '\\cdot |' + str(rez['ey']) + '/100| '  ' =  ' + str(rez['My']) 
+                    string += '|' + str(Myloc) + '| \\cdot'  + str(deltaMy) + ' + ' + str(F0) + '\\cdot |' + str(rez['ey']) + '/100| '  ' =  ' + str(rez['My']) 
             else: #Если учитываем знаки моментов
                 if F_dir == 'вверх': znak = '+'
                 if F_dir == 'вниз': znak = '-'
                 if delta_M_exc: #Если учитываем дельта к эксцентриситету
                     string = '$M_y = |M_{y,loc}' + znak +  'F \\cdot e_y| \\cdot \\delta_{My} = '
-                    string += '|' + str(Myloc) + znak + str(F) + '\\cdot ' 
+                    string += '|' + str(Myloc) + znak + str(F0) + '\\cdot ' 
                     if rez['ey'] <0: string += '(' +  str(rez['ey'])  + ')'
                     else: string += str(rez['ey'])
                     string += '/100| \\cdot ' + str(deltaMy) +  ' =  ' + str(rez['My']) 
                 else:  #Если не учитываем дельта к эксцентриситету
                     string = '$M_y = |M_{y,loc} \\cdot \\delta_{My}' + znak +  'F \\cdot e_y|  = '
-                    string += '|' + str(Myloc) + ' \\cdot'  + str(deltaMy) + znak + str(F) + '\\cdot '
+                    string += '|' + str(Myloc) + ' \\cdot'  + str(deltaMy) + znak + str(F0) + '\\cdot '
                     if rez['ey'] <0: string += '(' +  str(rez['ey'])  + ')'
                     else: string += str(rez['ey'])
                     string +=  '/100| '  ' =  ' + str(rez['My']) 
@@ -1055,7 +998,7 @@ if is_report:
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$k_{b,F}=\\dfrac{F}{F_{b,ult}}=\\dfrac{'
-            string += str(F) + '}{' + str(rez['Fbult']) + '} = ' + str(rez['kbF']) + '.$'
+            string += str(F0) + '}{' + str(rez['Fbult']) + '} = ' + str(rez['kbF']) + '.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
         if True: #Проверка по моментам
@@ -1183,7 +1126,7 @@ if is_report:
                         st.write(string)
                         add_text_latex(doc.add_paragraph(), string)
                         string = '$k_{F}=\\dfrac{F}{F_{b,ult} + F_{sw,ult}}=\\dfrac{'
-                        string += str(F) + '}{' + str(rez['Fbult']) + '+' + str(rez['Fswult_check']) + '} = ' + str(rez['kF_check']) + '.$'
+                        string += str(F0) + '}{' + str(rez['Fbult']) + '+' + str(rez['Fswult_check']) + '} = ' + str(rez['kF_check']) + '.$'
                         st.write(string)
                         add_text_latex(doc.add_paragraph(), string)
                     if True: #Проверка по моментам

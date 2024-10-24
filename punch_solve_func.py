@@ -69,14 +69,17 @@ def generate_bounds (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
 
 def solve_sw_min(kb, h0, Rbt, Rsw, Asw, dx, dy):
     sw_min_code = 0 #0 - по расчету, 1 - конструктивные требования
-    if kb<1.25: kb = 1.25 #Проверяем условияе Fswult>=0.25*Fbult
+    kb_sw_code = 0
+    if kb<1.25:
+        kb = 1.25 #Проверяем условияе Fswult>=0.25*Fbult
+        kb_sw_code = 1
     sw_min = 0.8*Rsw*Asw/(Rbt*h0*(kb-1)) #Вычисляем минимальный шаг
     if sw_min>min(dx/4, dy/4): #Не менее 5 рядов (4 интервала) на каждый участок контура
         sw_min = min(sw_min, dx/4, dy/4) 
         sw_min_code = 1
-    #Округляем до 0.5см в большую сторону
-    sw_min =round(floor(sw_min/0.5)*0.5,1)
-    return sw_min, sw_min_code
+    #Округляем до 0.5см в меньшую сторону
+    sw_min =round(floor(sw_min/0.1)*0.1,1)
+    return sw_min, sw_min_code, kb_sw_code
 
 def solve_geom_props (V):
     #V - массив координат линий контура [ [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
@@ -86,6 +89,7 @@ def solve_geom_props (V):
     ymin0, ymax0 = round(V[:,1].min(), 2), round(V[:,1].max(), 2)
     #Размеры контура
     dx, dy = round(xmax0 - xmin0, 2), round(ymax0 - ymin0, 2)
+    A = round(dx*dy,2)
     L_arr, Lx_arr, Ly_arr = [], [], [] #Массивы длин участков и длин их проекций
     cx0_arr, cy0_arr = [], [] #Массивы центров тяжести относительно начальной системы
     cx_arr, cy_arr = [], [] #Массивы центров тяжести относительно центра контура
@@ -159,7 +163,7 @@ def solve_geom_props (V):
             'WxL': WxL, 'WxR': WxR, 'WyB': WyB, 'WyT': WyT,
             'xL': xL, 'xR': xR, 'yB': yB, 'yT': yT,
             'xmax': xmax, 'ymax': ymax,
-            'dx': dx, 'dy': dy,
+            'dx': dx, 'dy': dy, 'A': A,
             'Sx0': Sx0, 'Sy0': Sy0,
             'Sx0_arr': Sx0_arr, 'Sy0_arr': Sy0_arr,
             'Ix0_arr': Ix0_arr, 'Iy0_arr': Iy0_arr,
@@ -170,7 +174,7 @@ def solve_geom_props (V):
             }
 
 def solve_forces (F0, Mxloc, Myloc, deltaMx, deltaMy, F_dir, delta_M_exc, M_abs, xF, yF, xc, yc, q, A):
-    Fq = round(q*A, 1) #Разгружающая сила
+    Fq = round(floor(q*A*10)/10, 1) #Разгружающая сила
     F = round(F0 - Fq, 1) #Корректируем силу с учетом разгружающей нагрузки
     ex, ey = round(xc - xF, 2), round(yc - yF, 2) #Вычисляем эксцентриситеты продольной силы
     Mxexc = round(F*ex/100, 2) #Момент в направлении x от эксцентриситета
@@ -190,9 +194,9 @@ def solve_forces (F0, Mxloc, Myloc, deltaMx, deltaMy, F_dir, delta_M_exc, M_abs,
     return {'F': F, 'Fq': Fq, 'ex': ex, 'ey': ey, 'Mxexc': Mxexc, 'Myexc': Myexc, 'Mx': Mx, 'My': My}
 
 def solve_fb_ult (Rbt, h0, u, Wbx, Wby):
-    Fbult = round(Rbt*h0*u, 1)
-    Mbxult = round(Rbt*h0*Wbx, 2)
-    Mbyult = round(Rbt*h0*Wby, 2)
+    Fbult = round(Rbt*h0*u, 1) #Предельная сила, воспринимаемая бетоном
+    Mbxult = round(Rbt*h0*Wbx/100, 2) #Предельный момент в плоскости х, воспринимаемый бетоном
+    Mbyult = round(Rbt*h0*Wby/100, 2) #Предельный момент в плоскости y, воспринимаемый бетоном
     return {'Fbult': Fbult, 'Mbxult': Mbxult, 'Mbyult': Mbyult}
 
 def solve_fsw_ult (qsw, u, Wswx, Wswy, Fbult, Mbxult, Mbyult):
@@ -211,7 +215,7 @@ def solve_fsw_ult (qsw, u, Wswx, Wswy, Fbult, Mbxult, Mbyult):
         Fsw_code = 2
 
     #Расчет предельного момента в направлении оси х, воспринимаемог арматурой
-    Mswxult0 = round(0.8*qsw*Wswx, 2) #Начальное значение
+    Mswxult0 = round(0.8*qsw*Wswx/100, 2) #Начальное значение
     if Fsw_code == 2: #Если поперечная арматура не учитывается в расчте
         Mswxult = 0.00
         Mswx_code = 2
@@ -224,7 +228,7 @@ def solve_fsw_ult (qsw, u, Wswx, Wswy, Fbult, Mbxult, Mbyult):
             Mswx_code = 0
     
     #Расчет предельного момента в направлении оси у, воспринимаемого арматурой
-    Mswyult0 = round(0.8*qsw*Wswy, 2) #Начальное значение
+    Mswyult0 = round(0.8*qsw*Wswy/100, 2) #Начальное значение
     if Fsw_code == 2: #Если поперечная арматура не учитывается в расчте
         Mswyult = 0.00
         Mswy_code = 2
@@ -247,7 +251,8 @@ def solve_kb_coeff (F, Fbult, Mx, Mbxult, My, Mbyult):
         kbM = round(0.5*kbF, 3)
         kbM_code = 1
     else: kbM = kbM0
-    return {'kbF': kbF, 'kbM0': kbM0, 'kbM': kbM, 'kbM_code': kbM_code}
+    kb = round(kbF + kbM, 3)
+    return {'kbF': kbF, 'kbM0': kbM0, 'kbM': kbM, 'kb': kb, 'kbM_code': kbM_code}
 
 def solve_k_coeff (F, Fbult, Fswult, Mx, Mbxult, Mswxult, My, Mbyult, Mswyult):
     kM_code = 0 #0 - моменты не ограничены, 1 - ограничены
@@ -257,7 +262,83 @@ def solve_k_coeff (F, Fbult, Fswult, Mx, Mbxult, Mswxult, My, Mbyult, Mswyult):
         kM = round(0.5*kF, 3)
         kM_code = 1
     else: kM = kM0
-    return {'kF': kF, 'kM0': kM0, 'kM': kM, 'kM_code': kM_code}
+    k = round(kF + kM,3)
+    return {'kF': kF, 'kM0': kM0, 'kM': kM, 'k': k, 'kM_code': kM_code}
+
+def single_solve(b, h, dh0, h0, Rbt,
+                 is_cL, is_cR, is_cB, is_cT, cL, cR, cB, cT,
+                 F0, Mxloc, Myloc, deltaMx, deltaMy,
+                 F_dir, delta_M_exc, M_abs, xF, yF, q,
+                 Rsw, Asw, sw, kh0, sw_mode):
+    data = {} #Словарь с результатами
+
+    #Генерация расчетного контура
+    rez_contours = generate_contours(b, h, dh0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+    data.update(rez_contours)
+
+    #Генерация границ, при необходимости
+    rez_bounds =  generate_bounds(b, h, dh0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+    data.update(rez_bounds)
+
+    #Расчет геометрических характеристик контура
+    rez_geom_props =  solve_geom_props(data['contours'])
+    data.update(rez_geom_props)
+
+    #Расчет предельных усилий, воспринимаемых бетоном
+    rez_fb_ult = solve_fb_ult(Rbt, h0, data['u'], data['Wx'], data['Wy'])
+    data.update(rez_fb_ult)
+
+    #Вычисление расчетных усилий
+    #Вычисляем отпор, при необходимости
+    if round(q,1) != 0.0: #Если есть отпор
+        #Генерируем контур на расстоянии h0 (основание пирамиды продавливания)
+        bottom_area_contours = generate_contours(b, h, 2*h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+        #Вычисляем его характеристики
+        bottom_area_contours_props = solve_geom_props(bottom_area_contours['contours'])
+        #Извлекаем площадь нижнего основания пирамиды продавливания
+        A = round(bottom_area_contours_props['A']/100/100,2)
+        data.update({'Aq': A})
+    else: data.update({'Aq': 0.00})
+    #Вычисляем расчетные усилия
+    rez_forces = solve_forces(F0, Mxloc, Myloc, deltaMx, deltaMy, F_dir, delta_M_exc, M_abs, xF, yF, data['xc'], data['yc'], q, data['Aq'])
+    data.update(rez_forces)
+
+    #Коэффициенты использования по бетону
+    rez_b_coeff = solve_kb_coeff(data['F'], data['Fbult'], data['Mx'], data['Mbxult'], data['My'], data['Mbyult'])
+    data.update(rez_b_coeff)
+
+    #Проверка с арматурой
+    data.update({'Asw': Asw, 'Rsw': Rsw})
+    if sw_mode == 'подбор':
+        data.update({'sw_mode': 'подбор'})
+        if data['kb']>1:
+            #Вычисляем шаг
+            sw, sw_min_code, kb_sw_code = solve_sw_min(data['kb'], h0, Rbt, Rsw, Asw, data['dx'], data['dy'])
+            data.update({'sw': sw, 'sw_min_code': sw_min_code, 'kb_sw_code': kb_sw_code})
+            #Вычисляем интенсивность армирования
+            qsw = round(Rsw*Asw/sw, 5)
+            data.update({'qsw': qsw})
+            #Вычисляем предельные усилия, воспринимаемые арматурой
+            rez_sw_ult = solve_fsw_ult(qsw, data['u'], data['Wx'], data['Wy'], data['Fbult'], data['Mbxult'], data['Mbyult'])
+            data.update(rez_sw_ult)
+            #Коэффициенты использования с учетом поперечного армирования
+            rez_coeff = solve_k_coeff(data['F'], data['Fbult'], data['Fswult'], data['Mx'], data['Mbxult'], data['Mswxult'], data['My'], data['Mbyult'], data['Mswyult'])
+            data.update(rez_coeff)
+    if sw_mode == 'проверка':
+        #Вычисляем интенсивность армирования
+        qsw = round(Rsw*Asw/sw, 5)
+        data.update({'qsw': qsw})
+        #Вычисляем предельные усилия, воспринимаемые арматурой
+        rez_sw_ult = solve_fsw_ult(qsw, data['u'], data['Wx'], data['Wy'], data['Fbult'], data['Mbxult'], data['Mbyult'])
+        data.update(rez_sw_ult)
+        #Коэффициенты использования с учетом поперечного армирования
+        rez_coeff = solve_k_coeff(data['F'], data['Fbult'], data['Fswult'], data['Mx'], data['Mbxult'], data['Mswxult'], data['My'], data['Mbyult'], data['Mswyult'])
+        data.update(rez_coeff)
+
+    return data
+
+
+#ВСЕ, ЧТО НИЖЕ, СТАРЫЕ ФУНКЦИИ
 
 def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode, sw, nsw):
     #V - массив координат линий контура [   [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
@@ -420,3 +501,124 @@ def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaM
             'sw_Asw_min': sw_Asw_min, 'dsw_min': dsw_min,
             'sw_Asw_max': sw_Asw_max, 'dsw_max': dsw_max
             }
+
+
+def solve_arm (Asw_sw, h0, Lx, Ly):
+    nswmin = 1
+    nswmax = round(h0/5)
+    if nswmax>10: nswmax = 10
+    if nswmax < 3: nswmax = 3
+    nsw_arr = [round(nswmin + i) for i in range(nswmax-nswmin+1)]
+    sw_min = 5
+    sw_max = min(Lx/4, Ly/4)
+    sw_num = 6
+    sw_step = round((sw_max-sw_min)/sw_num,2)
+    sw_arr = [round(sw_min + i*sw_step,1) for i in range(sw_num+1)]
+    dsw_arr = [[] for i in range(len(nsw_arr))]
+    for i in range(len(nsw_arr)):
+        for j in range(len(sw_arr)):
+            tmp = round((Asw_sw*sw_arr[j]*4/(nsw_arr[i]*pi))**0.5*10,2)
+            if tmp>25: tmp = '-'
+            dsw_arr[i].append(tmp)
+    return nsw_arr, sw_arr, dsw_arr
+
+
+def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
+    contour = []
+    cL0 = round(max(min(cL,h0), h0),1)
+    cR0 = round(max(min(cR,h0), h0),1)
+    cT0 = round(max(min(cT,h0), h0),1)
+    cB0 = round(max(min(cB,h0), h0),1)
+    contour_gamma = []
+    contour_colour = []
+    contour_sides = []
+    contour_len = []
+    contour_len_pr = []
+    contour_center = []
+    if is_cL:
+        contour_x = [round(-cL0/2, 2), round(-cL0/2, 2)]
+        contour_y = [round(-cB0/2, 2), round(h+cT0/2, 2)]
+        if not is_cT: contour_y[1] = round(h+cT, 2)
+        if not is_cB: contour_y[0] = round(-cB, 2)
+        contour_gamma.append(round(h0/cL0,2))
+        contour.append([contour_x, contour_y])
+        contour_sides.append('левый')
+        L = round(((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5,2)
+        contour_len.append(L)
+        contour_xc = round(contour_x[0],2)
+        contour_yc = round(contour_y[0] + 0.5*L,2)
+        contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
+    if is_cR:
+        contour_x = [b+cR0/2, b+cR0/2]
+        contour_y = [-cB0/2, h+cT0/2]
+        if not is_cT: contour_y[1] = h+cT
+        if not is_cB: contour_y[0] = -cB
+        contour_gamma.append(round(h0/cR0,2))
+        contour.append([contour_x, contour_y])
+        contour_sides.append('правый')
+        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
+        contour_len.append(L)
+        contour_xc = contour_x[0]
+        contour_yc = contour_y[0] + 0.5*L
+        contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
+    if is_cB:
+        contour_x = [-cL0/2, b+cR0/2]
+        contour_y = [-cB0/2, -cB0/2]
+        if not is_cL: contour_x[0] = -cL
+        if not is_cR: contour_x[1] = b+cR
+        contour_gamma.append(round(h0/cB0,2))
+        contour.append([contour_x, contour_y])
+        contour_sides.append('нижний')
+        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
+        contour_len.append(L)
+        contour_yc = contour_y[0]
+        contour_xc = contour_x[0] + 0.5*L
+        contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
+    if is_cT:
+        contour_x = [-cL0/2, b+cR0/2]
+        contour_y = [h+cT0/2, h+cT0/2]
+        if not is_cL: contour_x[0] = -cL
+        if not is_cR: contour_x[1] = b+cR
+        contour_gamma.append(round(h0/cT0,2))
+        contour.append([contour_x, contour_y])
+        contour_sides.append('верхний')
+        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
+        contour_len.append(L)
+        contour_yc = contour_y[0]
+        contour_xc = contour_x[0] + 0.5*L
+        contour_center.append([contour_xc, contour_yc])
+        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
+        
+    return contour, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr
+
+def generate_red_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
+    add = 0.5*h0
+    bounds = []
+    if not is_cL:
+        contour_x = [-cL, -cL]
+        contour_y = [-add, h+add]
+        if not is_cB: contour_y[0] = -cB
+        if not is_cT: contour_y[1] = h+cT
+        bounds.append([contour_x, contour_y])
+    if not is_cR:
+        contour_x = [b+cR, b+cR]
+        contour_y = [-add, h+add]
+        if not is_cB: contour_y[0] = -cB
+        if not is_cT: contour_y[1] = h+cT
+        bounds.append([contour_x, contour_y])
+    if not is_cB:
+        contour_x = [-add, b+add]
+        contour_y = [-cB, -cB]
+        if not is_cL: contour_x[0] = -cL
+        if not is_cR: contour_x[1] = b+cR
+        bounds.append([contour_x, contour_y])
+    if not is_cT:
+        contour_x = [-add, b+add]
+        contour_y = [h+cT, h+cT]
+        if not is_cL: contour_x[0] = -cL
+        if not is_cR: contour_x[1] = b+cR
+        bounds.append([contour_x, contour_y])
+    return bounds
