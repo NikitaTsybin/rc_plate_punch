@@ -172,7 +172,7 @@ if True: #Ввод исходных данных
         Rsw = round(Rsw,3)
         nsw = cols2[3].number_input(label='$n_{sw}$, шт.', step=1, format="%i", value=2, min_value=1, max_value=10, label_visibility="visible")
         nsw = round(nsw)
-        sw = cols2[5].number_input(label='$s_w$, см', step=5.0, format="%.2f", value=6.0, min_value=0.0, max_value=100.0, label_visibility="visible", disabled=sw_block)
+        sw = cols2[5].number_input(label='$s_w$, см', step=5.0, format="%.2f", value=6.0, min_value=0.1, max_value=100.0, label_visibility="visible", disabled=sw_block)
         sw = round(sw,2)
         dsw = cols2[4].selectbox(label='$d_{sw}$, мм', options=dias, index=0, label_visibility="visible")
         dsw = round(dsw)
