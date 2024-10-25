@@ -48,6 +48,7 @@ qsw = round(Asw*Rsw/sw, 5)
 qsw0 = round(Asw*Rsw/sw, 5)
 kh0 = 1.5
 center = [25.0, 50.0]
+center_sw = [25.0, 50.0]
 
 st.header('Расчет на продавливание плиты')
 
