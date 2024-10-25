@@ -280,6 +280,13 @@ if num_elem<2:
     st.stop()
 
 if True: #Быстрый вывод основных результатов
+    st.write('Расчетные усилия:')
+    string = '$F = ' + str(result["F"]) +  '\\cdot тс; '
+    string += '\\quad M_x = ' + str(result["Mx"])+  '\\cdot тсм; '
+    string += '\\quad M_y = ' + str(result["My"])+  '\\cdot тсм.$'
+    if result['Fq'] != 0.0:
+        string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(q) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + '\\cdot тс$.]'
+    st.write(string)
     st.write('Предельные усилия, воспринимаемые бетоном:')
     string = '$F_{b,ult} = ' + str(result["Fbult"]) +  '\\cdot тс; '
     string += '\\quad M_{bx,ult} = ' + str(result["Mbxult"])+  '\\cdot тсм; '
@@ -301,13 +308,21 @@ if True: #Быстрый вывод основных результатов
     if is_sw:
         if 2>= result['kb'] > 1:
             if sw_mode == 'подбор':
-                sw_min, sw_min_code, kb_sw_code = solve_sw_min(result['kb'], h0, Rbt, Rsw, Asw, dx, dy)
                 string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$, составляет $s_w = ' + str(result['sw']) + '\\cdot см$.'
                 if result['sw_min_code'] == 1:
                     string += ' :blue[Учтено ограничение на максимальный шаг.]'
                 if result['kb_sw_code'] == 1:
                     string += ' :blue[Учтено требование $F_{sw,ult} \\ge 0.25 \\cdot F_{b,ult}$.]'
                 string += ' При данном шаге $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
+                st.write(string)
+            if sw_mode == 'проверка':
+                string = 'При заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$ и шаге $s_w = ' + str(result['sw']) + '\\cdot см$ '
+                string += 'усилие в поперечной арматуре $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
+                if result['ksw']>1:
+                    string += ':orange['
+                string += ' Вклад поперечного армирования ' + str(round(result['ksw']*100,1)) + '% от максимального.'
+                if result['ksw']>1:
+                    string += ']'
                 st.write(string)
             st.write('Предельные усилия, воспринимаемые арматурой:')
             string = '$F_{sw,ult} = ' + str(result["Fswult"]) +  '\\cdot тс; '
@@ -324,20 +339,27 @@ if True: #Быстрый вывод основных результатов
             if result['kM0'] != result['kM']:
                 string += ' :blue[Вклад моментов ограничен.]'
             st.write(string)
+            if result['k'] < 1:
+                string = ':green[Прочность обеспечена.]'
+            if result['k'] > 1:
+                string = ':red[Прочность не обеспечена.]'
+            st.write(string)
         if 2>= rez['kb'] > 1:
             string = 'Проверка за зоной установки поперечной арматуры.'
             string += ' Коэффициенты для расчетного контура на расстоянии $' + str(kh0) + '\\cdot h_0=' + str(round(kh0*h0,1)) +  '\\cdot см$:'
             st.write(string)
-            string = '$k_{b,F}='  + str(rez_sw['kbF'])
-            string += '; \\quad k_{b,M}='  + str(rez_sw['kbM'])
-            string += '; \\quad k_{b}='  + str(rez_sw['kb']) + '$.'
-            if rez_sw['kbM0'] != rez_sw['kbM']:
+            string = '$k_{b,F}='  + str(result_second['kbF'])
+            string += '; \\quad k_{b,M}='  + str(result_second['kbM'])
+            string += '; \\quad k_{b}='  + str(result_second['kb']) + '$.'
+            if result_second['kbM0'] != result_second['kbM']:
                 string += ' :blue[Вклад моментов ограничен.]'
+            if result['Fq'] != 0.0:
+                string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(q) + '\\cdot' + str(result_second['Aq']) + '=' + str(result_second['Fq']) + '\\cdot тс$.]'
             st.write(string)
-            if rez_sw['kb'] <= 1:
+            if result_second['kb'] <= 1:
                 string = ':green[Прочность за зоной поперечного армирования обеспечена.]'
                 st.write(string)
-            if rez_sw['kb'] > 1:
+            if result_second['kb'] > 1:
                 string = ':orange[Требуется увеличение зоны поперечного армирования.]'
                 st.write(string)
             #st.write(result_second['kbF'], result_second['kbM'], result_second['kb'])

@@ -292,7 +292,7 @@ def single_solve(b, h, dh0, h0, Rbt,
     #Вычисляем отпор, при необходимости
     if round(q,1) != 0.0: #Если есть отпор
         #Генерируем контур на расстоянии h0 (основание пирамиды продавливания)
-        bottom_area_contours = generate_contours(b, h, 2*h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+        bottom_area_contours = generate_contours(b, h, dh0+h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
         #Вычисляем его характеристики
         bottom_area_contours_props = solve_geom_props(bottom_area_contours['contours'])
         #Извлекаем площадь нижнего основания пирамиды продавливания
@@ -325,9 +325,12 @@ def single_solve(b, h, dh0, h0, Rbt,
             rez_coeff = solve_k_coeff(data['F'], data['Fbult'], data['Fswult'], data['Mx'], data['Mbxult'], data['Mswxult'], data['My'], data['Mbyult'], data['Mswyult'])
             data.update(rez_coeff)
     if sw_mode == 'проверка':
+        data.update({'sw_mode': 'подбор', 'sw': sw})
         #Вычисляем интенсивность армирования
         qsw = round(Rsw*Asw/sw, 5)
         data.update({'qsw': qsw})
+        ksw = round(0.8*qsw/Rbt/h0, 3)
+        data.update({'ksw': ksw})
         #Вычисляем предельные усилия, воспринимаемые арматурой
         rez_sw_ult = solve_fsw_ult(qsw, data['u'], data['Wx'], data['Wy'], data['Fbult'], data['Mbxult'], data['Mbyult'])
         data.update(rez_sw_ult)
