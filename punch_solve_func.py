@@ -73,7 +73,8 @@ def solve_sw_min(kb, h0, Rbt, Rsw, Asw, dx, dy):
     if kb<1.25:
         kb = 1.25 #Проверяем условияе Fswult>=0.25*Fbult
         kb_sw_code = 1
-    sw_min = 0.8*Rsw*Asw/(Rbt*h0*(kb-1)) #Вычисляем минимальный шаг
+    sw_min = 0.8*Rsw*Asw/(Rbt*h0*(kb-1))*0.99 #Вычисляем минимальный шаг
+    #0.99 здесь чтобы не отлавливать пограничные значения. Иногда, после всех округлений использование составляло 1.001
     if sw_min>min(dx/4, dy/4): #Не менее 5 рядов (4 интервала) на каждый участок контура
         sw_min = min(sw_min, dx/4, dy/4) 
         sw_min_code = 1
@@ -159,10 +160,14 @@ def solve_geom_props (V):
     WyB, WyT = round(Iy/abs(yB), 1), round(Iy/yT, 1)
     Wy = min(WyB, WyT)
     xmax, ymax = max(abs(xL),xR), max(abs(yB),yT)
+    xmin, ymin = min(xL,xR), min(yB,yT)
     return {'u': u, 'xc': xc, 'yc': yc, 'Ix': Ix, 'Iy': Iy, 'Wx': Wx, 'Wy': Wy,
             'WxL': WxL, 'WxR': WxR, 'WyB': WyB, 'WyT': WyT,
             'xL': xL, 'xR': xR, 'yB': yB, 'yT': yT,
             'xmax': xmax, 'ymax': ymax,
+            'xmin': xmin, 'ymin': ymin,
+            'xmax0': xmax0, 'ymax0': ymax0,
+            'xmin0': xmin0, 'ymin0': ymin0,
             'dx': dx, 'dy': dy, 'A': A,
             'Sx0': Sx0, 'Sy0': Sy0,
             'Sx0_arr': Sx0_arr, 'Sy0_arr': Sy0_arr,
@@ -265,19 +270,23 @@ def solve_k_coeff (F, Fbult, Fswult, Mx, Mbxult, Mswxult, My, Mbyult, Mswyult):
     k = round(kF + kM,3)
     return {'kF': kF, 'kM0': kM0, 'kM': kM, 'k': k, 'kM_code': kM_code}
 
-def single_solve(b, h, dh0, h0, Rbt,
+def single_solve(b, h, dh0, h0, Rbt, kh0,
                  is_cL, is_cR, is_cB, is_cT, cL, cR, cB, cT,
                  F0, Mxloc, Myloc, deltaMx, deltaMy,
                  F_dir, delta_M_exc, M_abs, xF, yF, q,
-                 Rsw, Asw, sw, kh0, sw_mode):
+                 is_sw, Rsw, Asw, sw, sw_mode):
     data = {} #Словарь с результатами
+    data.update({'b': b, 'h': h, 'dh0': dh0, 'h0': h0, 'kh0': kh0, 'is_cL': is_cL, 'is_cR': is_cR, 'is_cB': is_cB, 'is_cT': is_cT, 'cL': cL, 'cR': cR, 'cB': cB, 'cT': cT})
+    data.update({'is_sw': is_sw, 'Asw': Asw, 'Rsw': Rsw})
+    data.update({'sw_mode': sw_mode, 'sw': sw})
+    data.update({'q': q, 'F0': F0, 'Mxloc': Mxloc, 'Myloc': Myloc, 'F_dir': F_dir, 'delta_M_exc': delta_M_exc, 'M_abs': M_abs})
 
     #Генерация расчетного контура
-    rez_contours = generate_contours(b, h, dh0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+    rez_contours = generate_contours(data['b'], data['h'], data['dh0'], data['cL'], data['is_cL'], data['cR'], data['is_cR'], data['cB'], data['is_cB'], data['cT'], data['is_cT'])
     data.update(rez_contours)
 
     #Генерация границ, при необходимости
-    rez_bounds =  generate_bounds(b, h, dh0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+    rez_bounds =  generate_bounds(data['b'], data['h'], data['dh0'], data['cL'], data['is_cL'], data['cR'], data['is_cR'], data['cB'], data['is_cB'], data['cT'], data['is_cT'])
     data.update(rez_bounds)
 
     #Расчет геометрических характеристик контура
@@ -290,15 +299,15 @@ def single_solve(b, h, dh0, h0, Rbt,
 
     #Вычисление расчетных усилий
     #Вычисляем отпор, при необходимости
-    if round(q,1) != 0.0: #Если есть отпор
-        #Генерируем контур на расстоянии h0 (основание пирамиды продавливания)
-        bottom_area_contours = generate_contours(b, h, dh0+h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
-        #Вычисляем его характеристики
-        bottom_area_contours_props = solve_geom_props(bottom_area_contours['contours'])
-        #Извлекаем площадь нижнего основания пирамиды продавливания
-        A = round(bottom_area_contours_props['A']/100/100,2)
-        data.update({'Aq': A})
-    else: data.update({'Aq': 0.00})
+    
+    #Генерируем контур на расстоянии h0 (основание пирамиды продавливания)
+    bottom_area_contours = generate_contours(b, h, dh0+h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+    #Вычисляем его характеристики
+    bottom_area_contours_props = solve_geom_props(bottom_area_contours['contours'])
+    #Извлекаем площадь нижнего основания пирамиды продавливания
+    A = round(bottom_area_contours_props['A']/100/100,2)
+    data.update({'Aq': A})
+    
     #Вычисляем расчетные усилия
     rez_forces = solve_forces(F0, Mxloc, Myloc, deltaMx, deltaMy, F_dir, delta_M_exc, M_abs, xF, yF, data['xc'], data['yc'], q, data['Aq'])
     data.update(rez_forces)
@@ -308,7 +317,6 @@ def single_solve(b, h, dh0, h0, Rbt,
     data.update(rez_b_coeff)
 
     #Проверка с арматурой
-    data.update({'Asw': Asw, 'Rsw': Rsw})
     if sw_mode == 'подбор':
         data.update({'sw_mode': 'подбор'})
         if data['kb']>1:
@@ -318,6 +326,8 @@ def single_solve(b, h, dh0, h0, Rbt,
             #Вычисляем интенсивность армирования
             qsw = round(Rsw*Asw/sw, 5)
             data.update({'qsw': qsw})
+            ksw = round(0.8*qsw/Rbt/h0, 3)
+            data.update({'ksw': ksw})
             #Вычисляем предельные усилия, воспринимаемые арматурой
             rez_sw_ult = solve_fsw_ult(qsw, data['u'], data['Wx'], data['Wy'], data['Fbult'], data['Mbxult'], data['Mbyult'])
             data.update(rez_sw_ult)
@@ -325,7 +335,6 @@ def single_solve(b, h, dh0, h0, Rbt,
             rez_coeff = solve_k_coeff(data['F'], data['Fbult'], data['Fswult'], data['Mx'], data['Mbxult'], data['Mswxult'], data['My'], data['Mbyult'], data['Mswyult'])
             data.update(rez_coeff)
     if sw_mode == 'проверка':
-        data.update({'sw_mode': 'подбор', 'sw': sw})
         #Вычисляем интенсивность армирования
         qsw = round(Rsw*Asw/sw, 5)
         data.update({'qsw': qsw})

@@ -15,6 +15,100 @@ import sys
 
 
 
+def fast_report (result, result_second):
+    st.write('Расчетные усилия:')
+    string = '$F = ' + str(result["F"]) +  '\\cdot тс; '
+    string += '\\quad M_x = ' + str(result["Mx"])+  '\\cdot тсм; '
+    string += '\\quad M_y = ' + str(result["My"])+  '\\cdot тсм.$'
+    if result['Fq'] != 0.0:
+        string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(result['q']) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + '\\cdot тс$.]'
+    st.write(string)
+    st.write('Предельные усилия, воспринимаемые бетоном:')
+    string = '$F_{b,ult} = ' + str(result["Fbult"]) +  '\\cdot тс; '
+    string += '\\quad M_{bx,ult} = ' + str(result["Mbxult"])+  '\\cdot тсм; '
+    string += '\\quad M_{by,ult} = ' + str(result["Mbyult"])+  '\\cdot тсм.$'
+    st.write(string)
+    st.write('Коэффициенты использования бетона по силе $k_{b,F}$, по моментам $k_{b,M}$ и суммарный $k_{b}$:')
+    string = '$k_{b,F}='  + str(result['kbF'])
+    string += '; \\quad k_{b,M}='  + str(result['kbM'])
+    string += '; \\quad k_{b}='  + str(result['kb']) + '$.'
+    if result['kbM0'] != result['kbM']:
+        string += ' :blue[Вклад моментов ограничен.]'
+    if result['kb'] > 2:
+        string += ' :red[Прочность не может быть обеспечена, необходимо увеличение габаритов площадки колонны, толщины плиты или класса бетона.]'
+    if result['kb'] <= 1:
+        string += ' :green[Прочность обеспечена. Поперечное армирование не требуется.]'
+    if 2>= result['kb'] > 1:
+        string += ' :orange[Требуется поперечное армирование.]'
+    st.write(string)
+    if result['is_sw']:
+        if 2>= result['kb']:
+            if result['sw_mode'] == 'подбор' and result['kb']>1:
+                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(result['Asw']) + '\\cdot см^2$, составляет $s_w = ' + str(result['sw']) + '\\cdot см$.'
+                if result['sw_min_code'] == 1:
+                    string += ' :blue[Учтено ограничение на максимальный шаг.]'
+                if result['kb_sw_code'] == 1:
+                    string += ' :blue[Учтено требование $F_{sw,ult} \\ge 0.25 \\cdot F_{b,ult}$.]'
+                string += ' При данном шаге $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
+                string += ' Вклад поперечного армирования ' + str(round(result['ksw']*100,1)) + '% от максимального.'
+                st.write(string)
+            if result['sw_mode'] == 'проверка':
+                string = 'При заданном $A_{sw} = ' + str(result['Asw']) + '\\cdot см^2$ и шаге $s_w = ' + str(result['sw']) + '\\cdot см$ '
+                string += 'усилие в поперечной арматуре $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
+                if result['ksw']>1:
+                    string += ':orange['
+                string += ' Вклад поперечного армирования ' + str(round(result['ksw']*100,1)) + '% от максимального.'
+                if result['ksw']>1:
+                    string += ']'
+                st.write(string)
+            if result['sw_mode'] == 'проверка' or (result['sw_mode'] == 'подбор' and result['kb']>1):
+                st.write('Предельные усилия, воспринимаемые арматурой:')
+                string = '$F_{sw,ult} = ' + str(result["Fswult"]) +  '\\cdot тс; '
+                string += '\\quad M_{sw,x,ult} = ' + str(result["Mswxult"])+  '\\cdot тсм; '
+                string += '\\quad M_{sw,y,ult} = ' + str(result["Mswyult"])+  '\\cdot тсм.$'
+                st.write(string)
+                if result['Fsw_code'] == 1:
+                    string = ':blue[Вклад поперечного армирования ограничен несущей способностью бетона]'
+                    st.write(string)
+                st.write('Коэффициенты использования по силе $k_F$, по моментам $k_M$ и суммарный $k$:')
+                string = '$k_{F}='  + str(result['kF'])
+                string += '; \\quad k_{M}='  + str(result['kM'])
+                string += '; \\quad k='  + str(result['k']) + '$.'
+                if result['kM0'] != result['kM']:
+                    string += ' :blue[Вклад моментов ограничен.]'
+                st.write(string)
+                if result['k'] < 1:
+                    string = ':green[Прочность обеспечена.]'
+                if result['k'] > 1:
+                    string = ':red[Прочность не обеспечена.]'
+                st.write(string)
+        if result['sw_mode'] == 'проверка' or (result['sw_mode'] == 'подбор' and result['kb']>1):
+            string = 'Проверка за зоной установки поперечной арматуры.'
+            string += ' Предельные усилия, воспринимаемые бетоном:'
+            st.write(string)
+            string = '$F_{b,ult} = ' + str(result_second["Fbult"]) +  '\\cdot тс; '
+            string += '\\quad M_{bx,ult} = ' + str(result_second["Mbxult"])+  '\\cdot тсм; '
+            string += '\\quad M_{by,ult} = ' + str(result_second["Mbyult"])+  '\\cdot тсм.$'
+            st.write(string)
+            string = ' Коэффициенты для расчетного контура на расстоянии $' + str(result_second['kh0']) + '\\cdot h_0=' + str(round(result_second['h0']*result_second['kh0'],1)) +  '\\cdot см$:'
+            st.write(string)
+            string = '$k_{b,F}='  + str(result_second['kbF'])
+            string += '; \\quad k_{b,M}='  + str(result_second['kbM'])
+            string += '; \\quad k_{b}='  + str(result_second['kb']) + '$.'
+            if result_second['kbM0'] != result_second['kbM']:
+                string += ' :blue[Вклад моментов ограничен.]'
+            if result['Fq'] != 0.0:
+                string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(result_second['q']) + '\\cdot' + str(result_second['Aq']) + '=' + str(result_second['Fq']) + '\\cdot тс$.]'
+            st.write(string)
+            if result_second['kb'] <= 1:
+                string = ':green[Прочность за зоной поперечного армирования обеспечена.]'
+                st.write(string)
+            if result_second['kb'] > 1:
+                string = ':orange[Требуется увеличение зоны поперечного армирования.]'
+                st.write(string)
+            #st.write(result_second['kbF'], result_second['kbM'], result_second['kb'])
+
+
 def init_data_help(): #Пояснения к параметрам
     with st.expander('Пояснения для исходных данных'):
         st.write('$b$ и $h$ – ширина и высота поперечного сечения сечения колонны, см;')

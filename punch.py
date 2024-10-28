@@ -26,20 +26,9 @@ from punch_draw_func import *
 from punch_text_func import *
 from punch_solve_func import *
 
-#height_hack = '''
-#<script>
-#    var hide_me_list = window.parent.document.querySelectorAll('iframe');
-#    for (let i = 0; i < hide_me_list.length; i++) { 
-#        if (hide_me_list[i].height == 0) {
-#            hide_me_list[i].parentNode.style.height = 0;
-#            hide_me_list[i].parentNode.style.marginBottom = '-1rem';
-#        };
-#    };
-#</script>
-#'''
-#st.components.v1.html(height_hack, height=0)
-
+#Доступные диаметры
 dias = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25]
+#Параметры поперечного армирования по умолчанию
 Rsw = 1.734
 sw = 6.0
 nsw = 2
@@ -47,24 +36,25 @@ Asw = 0.565
 qsw = round(Asw*Rsw/sw, 5)
 qsw0 = round(Asw*Rsw/sw, 5)
 kh0 = 1.5
-center = [25.0, 50.0]
-center_sw = [25.0, 50.0]
+table_concretes_data = pd.read_excel('RC_data.xlsx', sheet_name="Concretes_SP63", header=[0])
+table_reinf_data = pd.read_excel('RC_data.xlsx', sheet_name="Reinforcement_SP63", header=[0])
+available_concretes = table_concretes_data['Class'].to_list()
 
 st.header('Расчет на продавливание плиты')
 
 
 is_report = st.sidebar.toggle('Формировать отчет', value=False)
 
-if is_report:
+if is_report: #Если включена генерация отчета
     is_init_help = st.sidebar.toggle('Расчетные предпосылки', value=False)
     is_geom_help = st.sidebar.toggle('Геом. характеристики подробно', value=False)
-table_concretes_data = pd.read_excel('RC_data.xlsx', sheet_name="Concretes_SP63", header=[0])
-table_reinf_data = pd.read_excel('RC_data.xlsx', sheet_name="Reinforcement_SP63", header=[0])
-available_concretes = table_concretes_data['Class'].to_list()
+
+
 
 init_data_help()
 
 
+g = 10
 
 if True: #Ввод исходных данных
     cols = st.columns([1, 0.5])
@@ -133,6 +123,7 @@ if True: #Ввод исходных данных
     RbtMPA = cols2[2].number_input(label='$R_{bt}$, МПа', step=0.05, format="%.2f", value=Rbt01, min_value=0.1, max_value=2.2, label_visibility="visible", disabled=True)
     RbtMPA = round(RbtMPA,4)
     Rbt = 0.01019716213*RbtMPA
+    #Rbt = 0.01*RbtMPA
     Rbt = round(Rbt,5)
     F0 = cols2[3].number_input(label='$F$, тс', step=1.0, format="%.1f", value=49.0, min_value=1.0, max_value=50000.0, label_visibility="visible")
     Mxloc = cols2[4].number_input(label='$M_{x,loc}$, тсм', step=0.5, format="%.2f", value=4.0, label_visibility="visible")
@@ -205,13 +196,13 @@ if True: #Ввод исходных данных
 
 #Основной расчет (новый)
 if True:
-    solve_data = {'b': b, 'h': h, 'dh0': h0, 'h0': h0,
+    solve_data = {'b': b, 'h': h, 'dh0': h0, 'h0': h0, 'kh0': kh0,
                   'is_cL': is_cL, 'is_cR': is_cR, 'is_cB': is_cB, 'is_cT': is_cT,
                   'cL': cL, 'cR': cR, 'cB': cB, 'cT': cT,
                   'Rbt': Rbt,
                   'F0': F0, 'Mxloc': Mxloc, 'Myloc': Myloc, 'deltaMx': deltaMx, 'deltaMy': deltaMy,
                   'F_dir': F_dir, 'delta_M_exc': delta_M_exc, 'M_abs': M_abs, 'xF': round(b/2,2), 'yF': round(h/2,2), 'q': q,
-                  'Rsw': Rsw, 'Asw': Asw, 'sw': sw, 'kh0': kh0, 'sw_mode': sw_mode}
+                  'is_sw': is_sw, 'Rsw': Rsw, 'Asw': Asw, 'sw': sw, 'sw_mode': sw_mode}
     result = single_solve(**solve_data)
     solve_data_second = solve_data.copy()
     solve_data_second.update({'dh0': 2*kh0*h0})
@@ -222,7 +213,7 @@ if True:
     #collls[0].write(result)
     #collls[1].write(result_second)
     
-
+#st.write(result)
 
 if True: #Генерация контуров
     red_contours = generate_red_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
@@ -269,10 +260,10 @@ if num_elem>=2:
     #st.write(F0, rez['Mx'], rez['My'])
     #st.write(result)
 
-fig, image_stream, image_stream2 = draw_scheme(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
-                  red_contours, blue_contours, center, sizes)
-fig_sw, image_stream_sw, image_stream2_sw = draw_scheme(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT,
-                  red_contours_sw, blue_contours_sw, center_sw, sizes_sw)
+#fig, image_stream, image_stream2 = draw_scheme(b, h,
+#                  red_contours, blue_contours, center, sizes)
+fig, image_stream = draw_geometry(result)
+fig_sw, image_stream_sw = draw_geometry(result_second)
 #, use_container_width=True
 cols[0].plotly_chart(fig)
 
@@ -280,90 +271,8 @@ if num_elem<2:
     st.write('В расчете должно быть минимум два участка!')
     st.stop()
 
-if True: #Быстрый вывод основных результатов
-    st.write('Расчетные усилия:')
-    string = '$F = ' + str(result["F"]) +  '\\cdot тс; '
-    string += '\\quad M_x = ' + str(result["Mx"])+  '\\cdot тсм; '
-    string += '\\quad M_y = ' + str(result["My"])+  '\\cdot тсм.$'
-    if result['Fq'] != 0.0:
-        string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(q) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + '\\cdot тс$.]'
-    st.write(string)
-    st.write('Предельные усилия, воспринимаемые бетоном:')
-    string = '$F_{b,ult} = ' + str(result["Fbult"]) +  '\\cdot тс; '
-    string += '\\quad M_{bx,ult} = ' + str(result["Mbxult"])+  '\\cdot тсм; '
-    string += '\\quad M_{by,ult} = ' + str(result["Mbyult"])+  '\\cdot тсм.$'
-    st.write(string)
-    st.write('Коэффициенты использования бетона по силе $k_{b,F}$, по моментам $k_{b,M}$ и суммарный $k_{b}$:')
-    string = '$k_{b,F}='  + str(result['kbF'])
-    string += '; \\quad k_{b,M}='  + str(result['kbM'])
-    string += '; \\quad k_{b}='  + str(result['kb']) + '$.'
-    if result['kbM0'] != result['kbM']:
-        string += ' :blue[Вклад моментов ограничен.]'
-    if result['kb'] > 2:
-        string += ' :red[Прочность не может быть обеспечена, необходимо увеличение габаритов площадки колонны, толщины плиты или класса бетона.]'
-    if result['kb'] <= 1:
-        string += ' :green[Прочность обеспечена. Поперечное армирование не требуется.]'
-    if 2>= result['kb'] > 1:
-        string += ' :orange[Требуется поперечное армирование.]'
-    st.write(string)
-    if is_sw:
-        if 2>= result['kb'] > 1:
-            if sw_mode == 'подбор':
-                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$, составляет $s_w = ' + str(result['sw']) + '\\cdot см$.'
-                if result['sw_min_code'] == 1:
-                    string += ' :blue[Учтено ограничение на максимальный шаг.]'
-                if result['kb_sw_code'] == 1:
-                    string += ' :blue[Учтено требование $F_{sw,ult} \\ge 0.25 \\cdot F_{b,ult}$.]'
-                string += ' При данном шаге $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
-                st.write(string)
-            if sw_mode == 'проверка':
-                string = 'При заданном $A_{sw} = ' + str(Asw) + '\\cdot см^2$ и шаге $s_w = ' + str(result['sw']) + '\\cdot см$ '
-                string += 'усилие в поперечной арматуре $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
-                if result['ksw']>1:
-                    string += ':orange['
-                string += ' Вклад поперечного армирования ' + str(round(result['ksw']*100,1)) + '% от максимального.'
-                if result['ksw']>1:
-                    string += ']'
-                st.write(string)
-            st.write('Предельные усилия, воспринимаемые арматурой:')
-            string = '$F_{sw,ult} = ' + str(result["Fswult"]) +  '\\cdot тс; '
-            string += '\\quad M_{sw,x,ult} = ' + str(result["Mswxult"])+  '\\cdot тсм; '
-            string += '\\quad M_{sw,y,ult} = ' + str(result["Mswyult"])+  '\\cdot тсм.$'
-            st.write(string)
-            if result['Fsw_code'] == 1:
-                string = ':blue[Вклад поперечного армирования ограничен несущей способностью бетона]'
-                st.write(string)
-            st.write('Коэффициенты использования по силе $k_F$, по моментам $k_M$ и суммарный $k$:')
-            string = '$k_{F}='  + str(result['kF'])
-            string += '; \\quad k_{M}='  + str(result['kM'])
-            string += '; \\quad k='  + str(result['k']) + '$.'
-            if result['kM0'] != result['kM']:
-                string += ' :blue[Вклад моментов ограничен.]'
-            st.write(string)
-            if result['k'] < 1:
-                string = ':green[Прочность обеспечена.]'
-            if result['k'] > 1:
-                string = ':red[Прочность не обеспечена.]'
-            st.write(string)
-        if 2>= rez['kb'] > 1:
-            string = 'Проверка за зоной установки поперечной арматуры.'
-            string += ' Коэффициенты для расчетного контура на расстоянии $' + str(kh0) + '\\cdot h_0=' + str(round(kh0*h0,1)) +  '\\cdot см$:'
-            st.write(string)
-            string = '$k_{b,F}='  + str(result_second['kbF'])
-            string += '; \\quad k_{b,M}='  + str(result_second['kbM'])
-            string += '; \\quad k_{b}='  + str(result_second['kb']) + '$.'
-            if result_second['kbM0'] != result_second['kbM']:
-                string += ' :blue[Вклад моментов ограничен.]'
-            if result['Fq'] != 0.0:
-                string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(q) + '\\cdot' + str(result_second['Aq']) + '=' + str(result_second['Fq']) + '\\cdot тс$.]'
-            st.write(string)
-            if result_second['kb'] <= 1:
-                string = ':green[Прочность за зоной поперечного армирования обеспечена.]'
-                st.write(string)
-            if result_second['kb'] > 1:
-                string = ':orange[Требуется увеличение зоны поперечного армирования.]'
-                st.write(string)
-            #st.write(result_second['kbF'], result_second['kbM'], result_second['kb'])
+#Быстрый вывод основных результатов
+fast_report (result, result_second)
 
 if is_report:
     doc = Document('Template_punch.docx')
