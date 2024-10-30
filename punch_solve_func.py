@@ -71,16 +71,17 @@ def solve_sw_min(kb, h0, Rbt, Rsw, Asw, dx, dy):
     sw_min_code = 0 #0 - по расчету, 1 - конструктивные требования
     kb_sw_code = 0
     if kb<1.25:
-        kb = 1.25 #Проверяем условияе Fswult>=0.25*Fbult
+        kb = 1.252 #Проверяем условияе Fswult>=0.25*Fbult
         kb_sw_code = 1
-    sw_min = 0.8*Rsw*Asw/(Rbt*h0*(kb-1))*0.99 #Вычисляем минимальный шаг
+    sw_min = 0.8*Rsw*Asw/(Rbt*h0*(kb-1))*0.999 #Вычисляем минимальный шаг
+    sw_min0 = round(sw_min, 1)
     #0.99 здесь чтобы не отлавливать пограничные значения. Иногда, после всех округлений использование составляло 1.001
     if sw_min>min(dx/4, dy/4): #Не менее 5 рядов (4 интервала) на каждый участок контура
         sw_min = min(sw_min, dx/4, dy/4) 
         sw_min_code = 1
     #Округляем до 0.5см в меньшую сторону
-    sw_min =round(floor(sw_min/0.1)*0.1,1)
-    return sw_min, sw_min_code, kb_sw_code
+    sw_min = round(floor(sw_min/0.1)*0.1,1)
+    return sw_min, sw_min_code, kb_sw_code, sw_min0
 
 def solve_geom_props (V):
     #V - массив координат линий контура [ [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
@@ -92,8 +93,8 @@ def solve_geom_props (V):
     dx, dy = round(xmax0 - xmin0, 2), round(ymax0 - ymin0, 2)
     A = round(dx*dy,2)
     L_arr, Lx_arr, Ly_arr = [], [], [] #Массивы длин участков и длин их проекций
-    cx0_arr, cy0_arr = [], [] #Массивы центров тяжести относительно начальной системы
-    cx_arr, cy_arr = [], [] #Массивы центров тяжести относительно центра контура
+    xc0_arr, yc0_arr = [], [] #Массивы центров тяжести относительно начальной системы
+    xc_arr, yc_arr = [], [] #Массивы центров тяжести относительно центра контура
     Sx0_arr, Sy0_arr = [], [] #Массивы статических моментов инерции относительно начальной системы
     Ix0_arr, Iy0_arr = [], [] #Массивы собственных моментов инерции
     Ix_arr, Iy_arr = [], [] #Массивы моментов инерции
@@ -113,13 +114,13 @@ def solve_geom_props (V):
         #Добавляем его длину в суммарную
         u += L_i
         #Вычисляем координаты центра i-го участка
-        cx0_i = round((x2 - x1)/2 + x1,2)
-        cy0_i = round((y2 - y1)/2 + y1,2)
-        cx0_arr.append(cx0_i)
-        cy0_arr.append(cy0_i)
+        xc0_i = round((x2 - x1)/2 + x1,2)
+        yc0_i = round((y2 - y1)/2 + y1,2)
+        xc0_arr.append(xc0_i)
+        yc0_arr.append(yc0_i)
         #Вычисляем статические моменты i-го участка
-        Sx0_i = round(L_i*cx0_i,1)
-        Sy0_i = round(L_i*cy0_i,1)
+        Sx0_i = round(L_i*xc0_i,1)
+        Sy0_i = round(L_i*yc0_i,1)
         Sx0_arr.append(Sx0_i)
         Sy0_arr.append(Sy0_i)     
         #Добавляем их в суммарные
@@ -127,6 +128,7 @@ def solve_geom_props (V):
         Sy0 += Sy0_i
         j += 1
     Sx0, Sy0 = round(Sx0, 1), round(Sy0, 1)
+    u = round(u, 2)
     #Вычисляем координаты центра тяжести всего контура
     xc, yc = round(Sx0/u, 2), round(Sy0/u, 2)
     #Вычисляем координаты минимума и максимума относительно геометрического центра тяжести
@@ -138,18 +140,18 @@ def solve_geom_props (V):
         x1, x2 = V[i, 0] - xc
         y1, y2 = V[i, 1] - yc
         #Вычисляем центр тяжести
-        cx_i = round((x2 - x1)/2 + x1, 2)
-        cy_i = round((y2 - y1)/2 + y1, 2)
-        cx_arr.append(cx_i)
-        cy_arr.append(cy_i)
+        xc_i = round((x2 - x1)/2 + x1, 2)
+        yc_i = round((y2 - y1)/2 + y1, 2)
+        xc_arr.append(xc_i)
+        yc_arr.append(yc_i)
         #Собственные моменты инерции
         Ix0_i = round(Lx_arr[i]**3/12, 1)
         Iy0_i = round(Ly_arr[i]**3/12, 1)
         Ix0_arr.append(Ix0_i)
         Iy0_arr.append(Iy0_i)
         #Моменты инерции относительно центра тяжести
-        Ix_i = round(Ix0_i + L_arr[i]*cx_i**2, 1)
-        Iy_i = round(Iy0_i + L_arr[i]*cy_i**2, 1)
+        Ix_i = round(Ix0_i + L_arr[i]*xc_i**2, 1)
+        Iy_i = round(Iy0_i + L_arr[i]*yc_i**2, 1)
         Ix_arr.append(Ix_i)
         Iy_arr.append(Iy_i)
         Ix = Ix + Ix_i
@@ -174,8 +176,8 @@ def solve_geom_props (V):
             'Ix0_arr': Ix0_arr, 'Iy0_arr': Iy0_arr,
             'Ix_arr': Ix_arr, 'Iy_arr': Iy_arr,
             'L_arr': L_arr, 'Lx_arr': Lx_arr, 'Ly_arr': Ly_arr,
-            'cx0_arr': cx0_arr, 'cy0_arr': cy0_arr,
-            'cx_arr': cx_arr, 'cy_arr': cy_arr
+            'xc0_arr': xc0_arr, 'yc0_arr': yc0_arr,
+            'xc_arr': xc_arr, 'yc_arr': yc_arr
             }
 
 def solve_forces (F0, Mxloc, Myloc, deltaMx, deltaMy, F_dir, delta_M_exc, M_abs, xF, yF, xc, yc, q, A):
@@ -274,19 +276,27 @@ def single_solve(b, h, dh0, h0, Rbt, kh0,
                  is_cL, is_cR, is_cB, is_cT, cL, cR, cB, cT,
                  F0, Mxloc, Myloc, deltaMx, deltaMy,
                  F_dir, delta_M_exc, M_abs, xF, yF, q,
-                 is_sw, Rsw, Asw, sw, sw_mode):
+                 is_sw, Rsw, Asw, sw, sw_mode, **kwargs):
     data = {} #Словарь с результатами
     data.update({'b': b, 'h': h, 'dh0': dh0, 'h0': h0, 'kh0': kh0, 'is_cL': is_cL, 'is_cR': is_cR, 'is_cB': is_cB, 'is_cT': is_cT, 'cL': cL, 'cR': cR, 'cB': cB, 'cT': cT})
-    data.update({'is_sw': is_sw, 'Asw': Asw, 'Rsw': Rsw})
+    data.update({'Rbt': Rbt, 'is_sw': is_sw, 'Asw': Asw, 'Rsw': Rsw})
     data.update({'sw_mode': sw_mode, 'sw': sw})
     data.update({'q': q, 'F0': F0, 'Mxloc': Mxloc, 'Myloc': Myloc, 'F_dir': F_dir, 'delta_M_exc': delta_M_exc, 'M_abs': M_abs})
+    data.update({'deltaMx': deltaMx, 'deltaMy': deltaMy})
+    data.update({'xF': xF, 'yF': yF})
+    #data.update({'ctype': kwargs['ctype'], 'Rbt0': kwargs['Rbt0'], 'gammabt': kwargs['gammabt']})
+    data.update(kwargs)
 
     #Генерация расчетного контура
-    rez_contours = generate_contours(data['b'], data['h'], data['dh0'], data['cL'], data['is_cL'], data['cR'], data['is_cR'], data['cB'], data['is_cB'], data['cT'], data['is_cT'])
+    rez_contours = generate_contours(data['b'], data['h'], data['dh0'],
+                                     data['cL'], data['is_cL'], data['cR'], data['is_cR'],
+                                     data['cB'], data['is_cB'], data['cT'], data['is_cT'])
     data.update(rez_contours)
 
     #Генерация границ, при необходимости
-    rez_bounds =  generate_bounds(data['b'], data['h'], data['dh0'], data['cL'], data['is_cL'], data['cR'], data['is_cR'], data['cB'], data['is_cB'], data['cT'], data['is_cT'])
+    rez_bounds =  generate_bounds(data['b'], data['h'], data['dh0'],
+                                  data['cL'], data['is_cL'], data['cR'], data['is_cR'],
+                                  data['cB'], data['is_cB'], data['cT'], data['is_cT'])
     data.update(rez_bounds)
 
     #Расчет геометрических характеристик контура
@@ -294,22 +304,34 @@ def single_solve(b, h, dh0, h0, Rbt, kh0,
     data.update(rez_geom_props)
 
     #Расчет предельных усилий, воспринимаемых бетоном
-    rez_fb_ult = solve_fb_ult(Rbt, h0, data['u'], data['Wx'], data['Wy'])
+    rez_fb_ult = solve_fb_ult(data['Rbt'], data['h0'], data['u'], data['Wx'], data['Wy'])
     data.update(rez_fb_ult)
 
     #Вычисление расчетных усилий
-    #Вычисляем отпор, при необходимости
-    
+    #Вычисляем отпор
     #Генерируем контур на расстоянии h0 (основание пирамиды продавливания)
-    bottom_area_contours = generate_contours(b, h, dh0+h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
+    bottom_area_contours = generate_contours(data['b'], data['h'], data['dh0']+data['h0'],
+                                             data['cL'], data['is_cL'], data['cR'], data['is_cR'],
+                                             data['cB'], data['is_cB'], data['cT'], data['is_cT'])
+    bottom_area_bounds = generate_bounds(data['b'], data['h'], data['dh0']+data['h0'],
+                                  data['cL'], data['is_cL'], data['cR'], data['is_cR'],
+                                  data['cB'], data['is_cB'], data['cT'], data['is_cT'])
     #Вычисляем его характеристики
     bottom_area_contours_props = solve_geom_props(bottom_area_contours['contours'])
     #Извлекаем площадь нижнего основания пирамиды продавливания
     A = round(bottom_area_contours_props['A']/100/100,2)
     data.update({'Aq': A})
+    data.update({'bottom_contours': bottom_area_contours['contours']})
+    data.update({'xmin0b': bottom_area_contours_props['xmin0']})
+    data.update({'xmax0b': bottom_area_contours_props['xmax0']})
+    data.update({'ymin0b': bottom_area_contours_props['ymin0']})
+    data.update({'ymax0b': bottom_area_contours_props['ymax0']})
+    data.update({'dxb': bottom_area_contours_props['dx']})
+    data.update({'dyb': bottom_area_contours_props['dy']})
+    data.update({'bottom_bounds': bottom_area_bounds['bounds']})
     
     #Вычисляем расчетные усилия
-    rez_forces = solve_forces(F0, Mxloc, Myloc, deltaMx, deltaMy, F_dir, delta_M_exc, M_abs, xF, yF, data['xc'], data['yc'], q, data['Aq'])
+    rez_forces = solve_forces(data['F0'], data['Mxloc'], data['Myloc'], data['deltaMx'], data['deltaMy'], data['F_dir'], data['delta_M_exc'], data['M_abs'], data['xF'], data['yF'], data['xc'], data['yc'], data['q'], data['Aq'])
     data.update(rez_forces)
 
     #Коэффициенты использования по бетону
@@ -321,8 +343,8 @@ def single_solve(b, h, dh0, h0, Rbt, kh0,
         data.update({'sw_mode': 'подбор'})
         if data['kb']>1:
             #Вычисляем шаг
-            sw, sw_min_code, kb_sw_code = solve_sw_min(data['kb'], h0, Rbt, Rsw, Asw, data['dx'], data['dy'])
-            data.update({'sw': sw, 'sw_min_code': sw_min_code, 'kb_sw_code': kb_sw_code})
+            sw, sw_min_code, kb_sw_code, sw_min0 = solve_sw_min(data['kb'], h0, Rbt, Rsw, Asw, data['dx'], data['dy'])
+            data.update({'sw': sw, 'sw_min_code': sw_min_code, 'kb_sw_code': kb_sw_code, 'sw_min0': sw_min0})
             #Вычисляем интенсивность армирования
             qsw = round(Rsw*Asw/sw, 5)
             data.update({'qsw': qsw})
@@ -350,287 +372,3 @@ def single_solve(b, h, dh0, h0, Rbt, kh0,
     return data
 
 
-#ВСЕ, ЧТО НИЖЕ, СТАРЫЕ ФУНКЦИИ
-
-def find_contour_geometry (V, M, Rbt, Rsw, h0, F, Mxloc, Myloc, deltaMx,  deltaMy, xcol, ycol, M_abs, delta_M_exc, F_dir, is_sw, qsw, sw_mode, sw, nsw):
-    #V - массив координат линий контура [   [[x1,x2], [y1,y2]],    [[x1,x2], [y1,y2]], ...   ]
-    #M - вектор масс линий
-    #Объявляем нулевыми суммарные длину и моменты инерции
-    V = np.array(V)
-    M = np.array(M)
-    Sx_arr, Sy_arr = [], []
-    Ix_arr, Iy_arr = [], []
-    Ix0_arr, Iy0_arr = [], []
-    #print(V1)
-    Lsum, Sx, Sy, Ix, Iy = 0, 0, 0, 0, 0
-    Fult = 0
-    j = 0
-    for i in V:
-        #Извлекаем координаты начала и конца i-го участка
-        x1, x2 = i[0]
-        y1, y2 = i[1]
-        #Вычисляем длину i-го участка
-        L_i = ((x1 - x2)**2 + (y1 - y2)**2)**0.5
-        L_i = round(L_i,2)
-        #Добавляем его длину в суммарную
-        Lsum = Lsum + L_i
-        #Вычисляем координаты центра i-го участка
-        center_i = ((x2 - x1)/2 + x1, (y2 - y1)/2 + y1)
-        #Вычисляем статические моменты i-го участка
-        Sx_i = round(L_i*center_i[0], 1)
-        Sx_arr.append(Sx_i)
-        Sy_i = round(L_i*center_i[1], 1)
-        Sy_arr.append(Sy_i)
-        #Добавляем их в суммарные
-        Sx = Sx + Sx_i
-        Sy = Sy + Sy_i
-        j += 1
-    Sx, Sy = round(Sx, 1), round(Sy, 1)
-    #Вычисляем координаты центра тяжести всего контура
-    xc, yc = round(Sx/Lsum, 2), round(Sy/Lsum, 2)
-    ex, ey = round(xc - xcol, 2), round(yc - ycol, 2)
-    #Расчет характеристик "без масс"
-    #Присваеваем максимум и минимум координат
-    xmin0, xmax0 = round(V[:,0].min(), 2), round(V[:,0].max(), 2)
-    ymin0, ymax0 = round(V[:,1].min(), 2), round(V[:,1].max(), 2)
-    for i in V:
-        #Вычисляем координаты минимума и максимума относительно геометрического центра тяжести
-        xL, xR = round(xmin0 - xc, 2), round(xmax0 - xc, 2)
-        yB, yT = round(ymin0 - yc, 2), round(ymax0 - yc, 2)
-        #Извлекаем координаты начала и конца i-го участка
-        #и пересчитываем их относительно центра тяжести
-        x1, x2 = i[0] - xc
-        y1, y2 = i[1] - yc
-        #Вычисляем центр тяжести
-        x0 = (x2 - x1)/2 + x1
-        y0 = (y2 - y1)/2 + y1
-        #Вычисляем длину i-го участка
-        L_i = ((x1 - x2)**2 + (y1 - y2)**2)**0.5
-        #Длина i-го участка вдоль оси x и y
-        Lx_i = ((x1 - x2)**2)**0.5
-        Ly_i = ((y1 - y2)**2)**0.5
-        #Собственные моменты инерции
-        Ix0_i = round(Lx_i**3/12, 1)
-        Iy0_i = round(Ly_i**3/12, 1)
-        Ix0_arr.append(Ix0_i)
-        Iy0_arr.append(Iy0_i)
-        #Моменты инерции относительно центра тяжести
-        Ix_i = round(Ix0_i + L_i*x0**2, 1)
-        Iy_i = round(Iy0_i + L_i*y0**2, 1)
-        Ix_arr.append(Ix_i)
-        Iy_arr.append(Iy_i)
-        Ix = Ix + Ix_i
-        Iy = Iy + Iy_i
-    Ix, Iy = round(Ix,1), round(Iy,1)
-    Wxl, Wxr = Ix/abs(xL), Ix/xR
-    Wxmin = round(min(Wxl, Wxr), 1)
-    Wyb, Wyt = Iy/abs(yB), Iy/yT
-    Wymin = round(min(Wyb, Wyt), 1)
-    Mxexc0 = round(F*ex/100, 2)
-    Myexc0 = round(F*ey/100, 2)
-    if F_dir == 'вниз':
-        Mxexc0, Myexc0 = -Mxexc0, -Myexc0
-    Mxexc, Myexc = Mxexc0, Myexc0
-    if M_abs:
-        Mxexc = abs(Mxexc)
-        Myexc = abs(Myexc)
-        Mxloc = abs(Mxloc)
-        Myloc = abs(Myloc)
-    if delta_M_exc:
-        Mxexc = Mxexc*deltaMx
-        Myexc = Myexc*deltaMy
-    Mx = round(Mxloc*deltaMx + Mxexc,2)
-    My = round(Myloc*deltaMy + Myexc,2)
-    Mx, My = abs(Mx), abs(My)
-    #Предельная сила, воспринимаемая бетоном
-    Fbult = round(Lsum*Rbt*h0,1)
-    Mbxult = round(Wxmin*h0*Rbt/100, 2)
-    Mbyult = round(Wymin*h0*Rbt/100, 2)
-    Fswult_check0 = round(Lsum*0.8*qsw,1)
-    Mswxult_check0 = round(Wxmin*0.8*qsw/100, 2)
-    Mswyult_check0 = round(Wymin*0.8*qsw/100, 2)
-    if Fswult_check0 > Fbult:
-        Fswult_check = Fbult
-        Mswxult_check = Mbxult
-        Mswyult_check = Mbyult
-    if Fswult_check0 < 0.25*Fbult:
-        Fswult_check = 0.0
-        Mswxult_check = 0.0
-        Mswyult_check = 0.0
-    if  0.25*Fbult <= Fswult_check0 <= Fbult:
-        Fswult_check = Fswult_check0
-        Mswxult_check = Mswxult_check0
-        Mswyult_check = Mswyult_check0
-    #Коэффициент использования по продольной силе
-    kbF= round(F/Fbult, 3)
-    
-    kF_check= round(F/(Fbult+Fswult_check), 3)
-    kbM0 = Mx/Mbxult + My/Mbyult
-    kbM0 = round(kbM0, 3)
-    kbM = round(min(kbM0, kbF/2), 3)
-
-    kM_check = Mx/(Mbxult+Mswxult_check) + My/(Mbyult+Mswyult_check)
-    kM0_check = round(kM_check, 3)
-    kM_check = round(min(kM0_check, kF_check/2), 3)
-    kb = round(kbF + kbM, 3)
-   
-    kbF0= F/Fbult
-    kbM00 = Mx/(Mbxult) + My/(Mbyult)
-    kbM00 = min(kbM00, kbF0/2)
-    kb0 = kbF0 + kbM00
-    sw_Asw_min = Rbt*h0*(kb0-1)/(0.8*Rsw)
-    sw_Asw_max = Rbt*h0/(0.8*Rsw)
-    if sw_Asw_min > 0:
-        dsw_min = (sw_Asw_min*sw*4/pi/nsw)**0.5*10.0
-    else: dsw_min = 0
-    dsw_max = (sw_Asw_max*sw*4/pi/nsw)**0.5*10.0
-    dsw_min = round(dsw_min,2)
-    dsw_max = round(dsw_max,2)
-    sw_Asw_min = round(sw_Asw_min, 4)
-    sw_Asw_max = round(sw_Asw_max, 4)
-    
-    k_check = round(kF_check + kM_check, 3)
-    xmax = max(abs(xL),xR)
-    ymax = max(abs(yB),yT)
-    return {'Lsum': Lsum, 'xc': xc, 'yc': yc, 'ex': ex, 'ey': ey,
-            'xL': xL, 'xR': xR, 'yB': yB, 'yT': yT,
-            'xmax': xmax, 'ymax': ymax,
-            'Ix': Ix, 'Iy': Iy, 
-            'Sx_arr': Sx_arr, 'Sy_arr': Sy_arr,
-            'Ix0_arr': Ix0_arr, 'Iy0_arr': Iy0_arr,
-            'Ix_arr': Ix_arr, 'Iy_arr': Iy_arr,
-            'Sx': Sx, 'Sy': Sy,
-            'Wxmin': Wxmin, 'Wymin': Wymin,
-            'Mxexc': Mxexc, 'Myexc': Myexc,
-            'Mxexc0': Mxexc0, 'Myexc0': Myexc0,
-            'Mxloc': Mxloc, 'Myloc': Myloc,
-            'Mx': Mx, 'My': My,
-            'Fbult': Fbult, 'Mbxult': Mbxult, 'Mbyult': Mbyult,
-            'Fswult_check0': Fswult_check0, 'Mswxult_check0': Mswxult_check0, 'Mswyult_check0': Mswyult_check0,
-            'Fswult_check': Fswult_check, 'Mswxult_check': Mswxult_check, 'Mswyult_check': Mswyult_check,
-            'kbF': kbF, 'kbM0': kbM0, 'kbM': kbM, 'kb': kb,
-            'kF_check': kF_check, 'kM0_check': kM0_check, 'kM_check': kM_check, 'k_check': k_check,
-            'sw_Asw_min': sw_Asw_min, 'dsw_min': dsw_min,
-            'sw_Asw_max': sw_Asw_max, 'dsw_max': dsw_max
-            }
-
-
-def solve_arm (Asw_sw, h0, Lx, Ly):
-    nswmin = 1
-    nswmax = round(h0/5)
-    if nswmax>10: nswmax = 10
-    if nswmax < 3: nswmax = 3
-    nsw_arr = [round(nswmin + i) for i in range(nswmax-nswmin+1)]
-    sw_min = 5
-    sw_max = min(Lx/4, Ly/4)
-    sw_num = 6
-    sw_step = round((sw_max-sw_min)/sw_num,2)
-    sw_arr = [round(sw_min + i*sw_step,1) for i in range(sw_num+1)]
-    dsw_arr = [[] for i in range(len(nsw_arr))]
-    for i in range(len(nsw_arr)):
-        for j in range(len(sw_arr)):
-            tmp = round((Asw_sw*sw_arr[j]*4/(nsw_arr[i]*pi))**0.5*10,2)
-            if tmp>25: tmp = '-'
-            dsw_arr[i].append(tmp)
-    return nsw_arr, sw_arr, dsw_arr
-
-
-def generate_blue_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
-    contour = []
-    cL0 = round(max(min(cL,h0), h0),1)
-    cR0 = round(max(min(cR,h0), h0),1)
-    cT0 = round(max(min(cT,h0), h0),1)
-    cB0 = round(max(min(cB,h0), h0),1)
-    contour_gamma = []
-    contour_colour = []
-    contour_sides = []
-    contour_len = []
-    contour_len_pr = []
-    contour_center = []
-    if is_cL:
-        contour_x = [round(-cL0/2, 2), round(-cL0/2, 2)]
-        contour_y = [round(-cB0/2, 2), round(h+cT0/2, 2)]
-        if not is_cT: contour_y[1] = round(h+cT, 2)
-        if not is_cB: contour_y[0] = round(-cB, 2)
-        contour_gamma.append(round(h0/cL0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('левый')
-        L = round(((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5,2)
-        contour_len.append(L)
-        contour_xc = round(contour_x[0],2)
-        contour_yc = round(contour_y[0] + 0.5*L,2)
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-    if is_cR:
-        contour_x = [b+cR0/2, b+cR0/2]
-        contour_y = [-cB0/2, h+cT0/2]
-        if not is_cT: contour_y[1] = h+cT
-        if not is_cB: contour_y[0] = -cB
-        contour_gamma.append(round(h0/cR0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('правый')
-        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
-        contour_len.append(L)
-        contour_xc = contour_x[0]
-        contour_yc = contour_y[0] + 0.5*L
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-    if is_cB:
-        contour_x = [-cL0/2, b+cR0/2]
-        contour_y = [-cB0/2, -cB0/2]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        contour_gamma.append(round(h0/cB0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('нижний')
-        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
-        contour_len.append(L)
-        contour_yc = contour_y[0]
-        contour_xc = contour_x[0] + 0.5*L
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-    if is_cT:
-        contour_x = [-cL0/2, b+cR0/2]
-        contour_y = [h+cT0/2, h+cT0/2]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        contour_gamma.append(round(h0/cT0,2))
-        contour.append([contour_x, contour_y])
-        contour_sides.append('верхний')
-        L = ((contour_x[1]-contour_x[0])**2 + (contour_y[1]-contour_y[0])**2)**0.5
-        contour_len.append(L)
-        contour_yc = contour_y[0]
-        contour_xc = contour_x[0] + 0.5*L
-        contour_center.append([contour_xc, contour_yc])
-        contour_len_pr.append([contour_x[1] - contour_x[0], contour_y[1] - contour_y[0]])
-        
-    return contour, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr
-
-def generate_red_contours (b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT):
-    add = 0.5*h0
-    bounds = []
-    if not is_cL:
-        contour_x = [-cL, -cL]
-        contour_y = [-add, h+add]
-        if not is_cB: contour_y[0] = -cB
-        if not is_cT: contour_y[1] = h+cT
-        bounds.append([contour_x, contour_y])
-    if not is_cR:
-        contour_x = [b+cR, b+cR]
-        contour_y = [-add, h+add]
-        if not is_cB: contour_y[0] = -cB
-        if not is_cT: contour_y[1] = h+cT
-        bounds.append([contour_x, contour_y])
-    if not is_cB:
-        contour_x = [-add, b+add]
-        contour_y = [-cB, -cB]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        bounds.append([contour_x, contour_y])
-    if not is_cT:
-        contour_x = [-add, b+add]
-        contour_y = [h+cT, h+cT]
-        if not is_cL: contour_x[0] = -cL
-        if not is_cR: contour_x[1] = b+cR
-        bounds.append([contour_x, contour_y])
-    return bounds

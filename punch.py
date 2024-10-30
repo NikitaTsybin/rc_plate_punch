@@ -1,4 +1,5 @@
-from math import pi, ceil, floor
+from ast import If
+from math import pi
 from PIL import Image
 import streamlit as st
 from streamlit import session_state as ss
@@ -6,14 +7,8 @@ import pandas as pd
 import numpy as np
 import docx
 from docx import Document
-from docx.shared import Pt
 from docx.shared import Mm
-from docx.shared import RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-import typing
-import latex2mathml.converter
-import mathml2omml
-from docx.oxml import parse_xml
 import io
 import os
 import sys
@@ -30,6 +25,9 @@ from punch_solve_func import *
 dias = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25]
 #Параметры поперечного армирования по умолчанию
 Rsw = 1.734
+Rsw0 = 170
+rtype = 'A500'
+dsw = 6
 sw = 6.0
 nsw = 2
 Asw = 0.565
@@ -39,22 +37,21 @@ kh0 = 1.5
 table_concretes_data = pd.read_excel('RC_data.xlsx', sheet_name="Concretes_SP63", header=[0])
 table_reinf_data = pd.read_excel('RC_data.xlsx', sheet_name="Reinforcement_SP63", header=[0])
 available_concretes = table_concretes_data['Class'].to_list()
+available_reinf = table_reinf_data['Class'].to_list()
+
 
 st.header('Расчет на продавливание плиты')
 
-
 is_report = st.sidebar.toggle('Формировать отчет', value=False)
 
+is_init_help, is_geom_help = False, False
 if is_report: #Если включена генерация отчета
     is_init_help = st.sidebar.toggle('Расчетные предпосылки', value=False)
     is_geom_help = st.sidebar.toggle('Геом. характеристики подробно', value=False)
 
-
-
+#Вывод справки по исходным данным
 init_data_help()
 
-
-g = 10
 
 if True: #Ввод исходных данных
     cols = st.columns([1, 0.5])
@@ -194,88 +191,48 @@ if True: #Ввод исходных данных
             qsw = qsw0
         ksw = round(ksw,3)
 
+#num_elements = 2
 #Основной расчет (новый)
 if True:
     solve_data = {'b': b, 'h': h, 'dh0': h0, 'h0': h0, 'kh0': kh0,
                   'is_cL': is_cL, 'is_cR': is_cR, 'is_cB': is_cB, 'is_cT': is_cT,
                   'cL': cL, 'cR': cR, 'cB': cB, 'cT': cT,
-                  'Rbt': Rbt,
+                  'Rbt': Rbt, 'ctype': ctype, 'Rbt0': Rbt0, 'gammabt': gammabt, 'RbtMPA': RbtMPA,
                   'F0': F0, 'Mxloc': Mxloc, 'Myloc': Myloc, 'deltaMx': deltaMx, 'deltaMy': deltaMy,
                   'F_dir': F_dir, 'delta_M_exc': delta_M_exc, 'M_abs': M_abs, 'xF': round(b/2,2), 'yF': round(h/2,2), 'q': q,
-                  'is_sw': is_sw, 'Rsw': Rsw, 'Asw': Asw, 'sw': sw, 'sw_mode': sw_mode}
+                  'is_sw': is_sw, 'Rsw': Rsw, 'Rsw0': Rsw0, 'Asw': Asw, 'sw': sw, 'sw_mode': sw_mode, 'rtype': rtype, 'dsw': dsw, 'nsw': nsw, 'qsw0': qsw0,
+                  'is_geom_help': is_geom_help}
+    #Результаты расчета по первому контуру
     result = single_solve(**solve_data)
+    #Число элементов в контуре
+    num_elements = len(result['contours'])
+    #Результаты расчета по второму контуру
     solve_data_second = solve_data.copy()
     solve_data_second.update({'dh0': 2*kh0*h0})
     result_second = single_solve(**solve_data_second)
-    #collls = st.columns([1,1])
-    #collls[0].write(solve_data)
-    #collls[1].write(solve_data_second)
-    #collls[0].write(result)
-    #collls[1].write(result_second)
     
-#st.write(result)
 
-if True: #Генерация контуров
-    red_contours = generate_red_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
-    blue_contours, contour_gamma, contour_sides, contour_len, contour_center, contour_len_pr = generate_blue_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
-    #tmp = generate_contours(b, h, h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)['contours']
-    #collls = st.columns([1,1])
-    #collls[0].write(blue_contours)
-    #collls[1].write(tmp)
-    red_contours_sw = generate_red_contours(b, h, 2*kh0*h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
-    blue_contours_sw, contour_gamma_sw, contour_sides_sw, contour_len_sw, contour_center_sw, contour_len_pr_sw = generate_blue_contours(b, h, 2*kh0*h0, cL, is_cL, cR, is_cR, cB, is_cB, cT, is_cT)
-    num_elem = len(blue_contours)
-    rez = 0
-    cont_arr = np.array(blue_contours)
-    cont_arr_sw = np.array(blue_contours_sw)
-    x_cont_min = cont_arr[:,0,:].min()
-    x_cont_min_sw = cont_arr_sw[:,0,:].min()
-    x_cont_max = cont_arr[:,0,:].max()
-    x_cont_max_sw = cont_arr_sw[:,0,:].max()
-    y_cont_min = cont_arr[:,1,:].min()
-    y_cont_min_sw = cont_arr_sw[:,1,:].min()
-    y_cont_max = cont_arr[:,1,:].max()
-    y_cont_max_sw = cont_arr_sw[:,1,:].max()
-    dx = x_cont_max - x_cont_min
-    dx_sw = x_cont_max_sw - x_cont_min_sw
-    dy = y_cont_max - y_cont_min
-    dy_sw = y_cont_max_sw - y_cont_min_sw
-    sizes = [x_cont_min, x_cont_max,y_cont_min, y_cont_max, dx, dy]
-    sizes_sw = [x_cont_min_sw, x_cont_max_sw, y_cont_min_sw, y_cont_max_sw, dx_sw, dy_sw]
+fig, image_stream = draw_geometry(result) #геометрия для расчета по первому контуру
+fig_sw, image_stream_sw = draw_geometry(result_second) #геометрия для расчета за поперечной арматурой
 
-if num_elem>=2:
-    rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F0, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
-    #rez2 = solve_geom_props(blue_contours)
-    #colls = st.columns([1,1])
-    #colls[0].write(rez)
-    #colls[1].write(rez2)
-    if sw_mode == 'подбор':
-        sw_min, sw_min_code, kb_sw_code = solve_sw_min(rez['kb'], h0, Rbt, Rsw, Asw, dx, dy)
-        qsw = round(Rsw*Asw/sw_min,5)
-        rez = find_contour_geometry(blue_contours, contour_gamma, Rbt, Rsw, h0, F0, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
-    rez_sw = find_contour_geometry(blue_contours_sw, contour_gamma_sw, Rbt, Rsw, h0, F0, Mxloc, Myloc, deltaMx, deltaMy, b/2, h/2, M_abs, delta_M_exc, F_dir, is_sw, qsw0, sw_mode, sw, nsw)
-    center = [rez['xc'], rez['yc']]
-    center_sw = [rez_sw['xc'], rez_sw['yc']]
-    #st.write(result['F'], result['Mx'], result['My'])
-    #st.write(F0, rez['Mx'], rez['My'])
-    #st.write(result)
+fig_Aq, image_stream_Aq = None, None
+if result['Fq'] != 0.0:
+    fig_Aq, image_stream_Aq = draw_Aq(result)
+    st.sidebar.write('Габариты основания пирамиды')
+    st.sidebar.plotly_chart(fig_Aq)
 
-#fig, image_stream, image_stream2 = draw_scheme(b, h,
-#                  red_contours, blue_contours, center, sizes)
-fig, image_stream = draw_geometry(result)
-fig_sw, image_stream_sw = draw_geometry(result_second)
-#, use_container_width=True
 cols[0].plotly_chart(fig)
 
-if num_elem<2:
-    st.write('В расчете должно быть минимум два участка!')
+if num_elements<2:
+    st.subheader('В расчете должно быть минимум два участка!')
     st.stop()
 
 #Быстрый вывод основных результатов
-fast_report (result, result_second)
+with st.expander('Краткий отчет'):
+    fast_report (result, result_second)
 
 if is_report:
-    doc = Document('Template_punch.docx')
+    doc = Document('Template.docx')
     styles_element = doc.styles.element
     rpr_default = styles_element.xpath('./w:docDefaults/w:rPrDefault/w:rPr')[0]
     lang_default = rpr_default.xpath('w:lang')[0]
@@ -284,7 +241,7 @@ if is_report:
     p = doc.paragraphs[-1]
     delete_paragraph(p)
     string = 'Расчет на продавливание при действии сосредоточенной силы и изгибающих моментов.'
-    doc.add_heading(string, level=0)
+    doc.add_heading(string, level=1)
     #st.subheader(string)
 
     string = 'Расчет производится согласно СП 63.13330.2018 п. 8.1.46 – 8.1.52.'
@@ -292,859 +249,42 @@ if is_report:
     doc.add_paragraph().add_run(string)
 
 
-    if is_init_help:
-        solve_help_text(doc, is_sw, M_abs, delta_M_exc, F_dir)
+    if is_init_help: report_solve_method(result, doc) #Вывод справки по расчету при необходимости
+    report_init_data(result, doc, image_stream_Aq) #Вывод исходных данных
 
-    init_data_text(doc, b, h, h0,
-                   ctype, Rbt0, gammabt, RbtMPA, Rbt,
-                   is_sw, rtype, Rsw0, Rsw,
-                   nsw, dsw, sw, Asw, sw_mode, qsw0, ksw0,
-                   F0, F_dir, Mxloc, Myloc,
-                   delta_M_exc, deltaMx, deltaMy)
+   
+    #Расчет геометрических характеристик
+    if result['is_geom_help']: report_full_geometry(result, doc, image_stream, image_stream_Aq)
+    else: report_short_geometry(result, doc, image_stream, image_stream_Aq)
 
-
-    if True: #Добавление эскиза расчетного контура в docx
-        string = 'Эскиз расчетного контура.'
-        doc.add_heading(string, level=2)
-        doc.add_picture(image_stream, width=Mm(80))
-        #doc.add_picture('test.svg', width=Mm(80))
-        p = doc.paragraphs[-1]
-        p.paragraph_format.first_line_indent = Mm(0)
-        p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    with st.expander('Геометрические характеристики контура'):
-        string = 'Геометрические характеристики контура.'
-        st.subheader(string)
-        doc.add_heading(string, level=2)
-        if is_geom_help: #Подробный расчет
-            if True: #Длины участков
-                string = 'Геометрические характеристики, такие как статические моменты, осевые моменты инерции, моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = 'Длины участков расчетного контура $L_i$, а также длины их проекций $L_{x,i}$ и $L_{y,i}$ в соответствии с эскизом приведены в таблице ниже.'
-
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
+    #Расчет действующих усилий
+    report_acting_forces(result, doc)
     
-                contours_lens = {'Li, см':[], 'Lxi, см':[], 'Lyi, см':[]}
-                contours_lens_names = []
-                for i in range(len(contour_len)):
-                    contours_lens_names.append(contour_sides[i])
-                    contours_lens['Li, см'].append(f'{float(contour_len[i]):g}')
-                    contours_lens['Lxi, см'].append(f'{float(contour_len_pr[i][0]):g}')
-                    contours_lens['Lyi, см'].append(f'{float(contour_len_pr[i][1]):g}')
-                contours_lens = pd.DataFrame.from_dict(contours_lens, orient='index', columns=contours_lens_names)
-                st.dataframe(contours_lens, use_container_width=True)
+    #Расчет предельных усилий, воспринимаемых бетоном
+    report_concrete_ultimate_forces(result, doc)
 
-                table = doc.add_table(contours_lens.shape[0]+1, contours_lens.shape[1]+1)
-                table.style = 'Стиль_таблицы'
-                for j in range(contours_lens.shape[-1]):
-                    table.cell(0,j+1).text = contours_lens.columns[j]
-                    table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                for i in range(contours_lens.shape[0]):
-                    for j in range(contours_lens.shape[-1]):
-                        table.cell(i+1,j+1).text = str(contours_lens.values[i,j])
-                        table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                table.cell(0,0).text = 'Участок'
-                table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(1,0).paragraphs[0]
-                add_text_latex(p, '$L_i$, см')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(2,0).paragraphs[0]
-                add_text_latex(p, '$L_{x,i}$, см')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(3,0).paragraphs[0]
-                add_text_latex(p, '$L_{y,i}$, см')
-                p.paragraph_format.first_line_indent = Mm(0)
-        
-            if True: #Периметр расчетного контура
-                string = 'Вычисляем периметр расчетного контура как сумму длин каждого из участков:'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-
-                string = '$u = \\sum_i L_i = '
-                string += f'{float(round(contour_len[0],3)):g}'
-                for i in range(1, len(contour_len)):
-                    string += '+'
-                    string += f'{float(round(contour_len[i],3)):g}'
-                string += f'={float(round(sum(contour_len),3)):g} \\cdot см.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
+    if result['is_sw'] and result['sw_mode'] == 'проверка':
+        #Расчет предельных усилий, воспринимаемых арматурой
+        report_reinf_ultimate_forces(result, doc)
+        report_full_strength(result, doc)
     
-            if True: #Центры тяжести участков
-                string = 'Положения центров тяжести $x_{c,0,i}$ и $y_{c,0,i}$ каждого из участков расчетного контура относительно левого нижнего угла колонны приведены в таблице ниже.'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                contours_cent = {'xc0i, см':[], 'yc0i, см':[]}
-                contours_cent_names = []
-                for i in range(len(contour_sides)):
-                    contours_cent_names.append(contour_sides[i])
-                    contours_cent['xc0i, см'].append(f'{float(round(contour_center[i][0],3)):g}')
-                    contours_cent['yc0i, см'].append(f'{float(round(contour_center[i][1],3)):g}')
-                contours_cent = pd.DataFrame.from_dict(contours_cent, orient='index', columns=contours_cent_names)
-                st.dataframe(contours_cent, use_container_width=True)
-                table = doc.add_table(contours_cent.shape[0]+1, contours_cent.shape[1]+1)
-                table.style = 'Стиль_таблицы'
-                for j in range(contours_cent.shape[-1]):
-                    table.cell(0,j+1).text = contours_cent.columns[j]
-                    table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                for i in range(contours_cent.shape[0]):
-                    for j in range(contours_cent.shape[-1]):
-                        table.cell(i+1,j+1).text = str(contours_cent.values[i,j])
-                        table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                table.cell(0,0).text = 'Участок'
-                table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(1,0).paragraphs[0]
-                add_math(p, 'x_{c,0,i}, см')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(2,0).paragraphs[0]
-                add_math(p, 'y_{c,0,i}, см')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
+    #Проверка прочности по бетону
+    if result['sw_mode'] == 'подбор':
+        report_concrete_strength(result, doc)
 
-            if True: #Статические моменты инерции
-                string = 'Статические моменты $S_{bx,0,i}$ и $S_{by,0,i}$ каждого из участков расчетного контура относительно левого нижнего угла колонны вычисляются по формулам:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = '$S_{bx,0,i} = L_{i} \\cdot x_{c,0,i} ; \\quad S_{by,0,i} = L_{i} \\cdot y_{c,0,i}.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = 'Результаты расчета статических моментов участков расчетного контура по указанным выше приведены в таблице ниже.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                contours_S = {'Sbx0i, см2':[], 'Sby0i, см2':[]}
-                contours_S_names = []
-                for i in range(len(contour_sides)):
-                    contours_S_names.append(contour_sides[i])
-                    contours_S['Sbx0i, см2'].append(f'{float(round(rez["Sx_arr"][i],1)):g}')
-                    contours_S['Sby0i, см2'].append(f'{float(round(rez["Sy_arr"][i],1)):g}')
-                contours_S = pd.DataFrame.from_dict(contours_S, orient='index', columns=contours_S_names)
-                st.dataframe(contours_S, use_container_width=True)
-                table = doc.add_table(contours_S.shape[0]+1, contours_S.shape[1]+1)
-                table.style = 'Стиль_таблицы'
-                for j in range(contours_S.shape[-1]):
-                    table.cell(0,j+1).text = contours_S.columns[j]
-                    table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                for i in range(contours_S.shape[0]):
-                    for j in range(contours_S.shape[-1]):
-                        table.cell(i+1,j+1).text = str(contours_S.values[i,j])
-                        table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                table.cell(0,0).text = 'Участок'
-                table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(1,0).paragraphs[0]
-                add_math(p, 'S_{bx,0,i}, см^2')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-                #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                p = table.cell(2,0).paragraphs[0]
-                add_math(p, 'S_{by,0,i}, см^2')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-                #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    #Вывод блока подбора шага поперечного армирования при необходимости
+    if result['is_sw'] and result['sw_mode'] == 'подбор' and result['kb'] > 1:
+        #Подбор шага поперечного армирования
+        report_solve_sw_min(result, doc)
+        #Расчет предельных усилий, воспринимаемых арматурой
+        report_reinf_ultimate_forces(result, doc)
+        report_full_strength(result, doc)
 
-            if True: #Статический момент инерции всего сечения
-                string = 'Статические моменты инерции всего расчетного контура относительно левого нижнего угла колонны вычисляем как сумму статических моментов инерции каждого из участков.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$ S_{bx,0} = \\sum_i S_{bx,0,i}= '
-                string += f'{float(round(rez["Sx_arr"][0],2)):g}'
-                for i in range(1, len(rez["Sx_arr"])):
-                    if rez["Sx_arr"][i] > 0:
-                        string += '+'
-                    string += f'{float(round(rez["Sx_arr"][i],2)):g}'
-                string += f'={float(round(rez["Sx"],2)):g} \\cdot см^2.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-                string = '$ S_{by,0} = \\sum_i S_{by,0,i}= '
-                string += f'{float(round(rez["Sy_arr"][0],2)):g}'
-                for i in range(1, len(rez["Sy_arr"])):
-                    if rez["Sy_arr"][i] > 0:
-                        string += '+'
-                    string += f'{float(round(rez["Sy_arr"][i],2)):g}'
-                string += f'={float(round(rez["Sy"],2)):g} \\cdot см^2.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-            if True: #Вычисление центра тяжести
-                string = 'Вычисляем положение геометрического центра тяжести контура относительно левого нижнего угла колонны.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$ x_c = \\dfrac{S_{bx,0}}{u} = '
-                string += '\\dfrac{' + f'{float(round(rez["Sx"],2)):g}' + '}{' + f'{float(round(rez["Lsum"],3)):g}' + '}='
-                string += f'{float(round(rez["xc"],3)):g} \\cdot см.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-                string = '$ y_c = \\dfrac{S_{by,0}}{u} = '
-                string += '\\dfrac{' + f'{float(round(rez["Sy"],2)):g}' + '}{' + f'{float(round(rez["Lsum"],3)):g}' + '}='
-                string += f'{float(round(rez["yc"],3)):g} \\cdot см.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-            if True: #Эксцентриситет продольной силы
-                if rez["ex"] !=0 or rez["ex"] !=0:
-                    string = 'Вычисляем эксцентриситет центра тяжести расчетного контура относительно центра колонны.'
-                    st.write(string)
-                    doc.add_paragraph().add_run(string)
-                    if rez["ex"] !=0:
-                        string = 'Вдоль оси $x$:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$e_x = x_c - b/2= '
-                        string += f'{float(rez["xc"]):g} -'
-                        string += f'{float(round(b/2,2)):g} = {float(rez["ex"]):g} \\cdot см.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                    if rez["ey"] !=0:
-                        string = 'Вдоль оси $y$:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$e_y = y_c - h/2= '
-                        string += f'{float(rez["yc"]):g} -'
-                        string += f'{float(round(h/2,2)):g} = {float(rez["ey"]):g} \\cdot см.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-
-            if True: #Вычисление центров тяжести участков
-                string = 'Вычисляем координаты центров тяжести каждого из элементов расчетного контура относительно центра тяжести всего расчетного контура по формулам:'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$x_{c,i} = x_{c,0,i} - x_c; \\quad y_{c,i} = y_{c,0,i} - y_c.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-                string = 'Результаты расчета по указанным выше формулам приведены в таблице ниже.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                contours_cent = {'xci, см':[], 'yci, см':[]}
-                contours_cent_names = []
-                for i in range(len(contour_sides)):
-                    contours_cent_names.append(contour_sides[i])
-                    contours_cent['xci, см'].append(f'{float(round(contour_center[i][0] - rez["xc"],3)):g}')
-                    contours_cent['yci, см'].append(f'{float(round(contour_center[i][1] - rez["yc"],3)):g}')
-                contours_cent = pd.DataFrame.from_dict(contours_cent, orient='index', columns=contours_cent_names)
-                st.dataframe(contours_cent, use_container_width=True)
-                table = doc.add_table(contours_cent.shape[0]+1, contours_cent.shape[1]+1)
-                table.style = 'Стиль_таблицы'
-                for j in range(contours_cent.shape[-1]):
-                    table.cell(0,j+1).text = contours_cent.columns[j]
-                    table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                for i in range(contours_cent.shape[0]):
-                    for j in range(contours_cent.shape[-1]):
-                        table.cell(i+1,j+1).text = str(contours_cent.values[i,j])
-                        table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                table.cell(0,0).text = 'Участок'
-                table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(1,0).paragraphs[0]
-                add_math(p, 'x_{c,i}, см')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(2,0).paragraphs[0]
-                add_math(p, 'y_{c,i}, см')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-
-            if True: #Вычисление наиболее удаленных точек
-                string = 'Расстояние до наиболее удаленных от геометрического центра тяжести точек (левой, $x_L$; правой, $x_R$; нижней, $y_B$; верхней, $y_T$) расчетного контура приведено в таблице ниже:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                max_values = [f'{float(round(rez["xL"],3)):g}',
-                                                f'{float(round(rez["xR"],3)):g}',
-                                                f'{float(round(rez["yB"],3)):g}',
-                                                f'{float(round(rez["yT"],3)):g}']
-                max_points = {'Расстояние, см':max_values}
-                max_points = pd.DataFrame.from_dict(max_points, orient='index', columns=['Левая','Правая','Нижняя','Верхняя'])
-                st.dataframe(max_points, use_container_width=True)
-                table = doc.add_table(2, 5)
-                table.style = 'Стиль_таблицы'
-                table.cell(1,0).text = 'Расстояние, см'
-                table.cell(1,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(0,1).paragraphs[0]
-                add_math(p, 'x_{L}')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(0,2).paragraphs[0]
-                add_math(p, 'x_{R}')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(0,3).paragraphs[0]
-                add_math(p, 'y_{B}')
-                p.paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(0,4).paragraphs[0]
-                add_math(p, 'y_{T}')
-                p.paragraph_format.first_line_indent = Mm(0)
-                for i in range(len(max_values)):
-                    p = table.cell(1,i+1).paragraphs[0]
-                    add_math(p, max_values[i])
-                    p.paragraph_format.first_line_indent = Mm(0)
-        
-                string = 'Расстояние до наиболее удаленных от центра тяжести точек расчетного контура составляет:'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$x_{\\max} = \\max(|x_{L}|,x_{R})='
-                string += str(round(rez["xmax"],3))
-                string += 'см; \\quad y_{\\max} = \\max(|y_{B}|,y_{T})='
-                string += str(round(rez["ymax"],3))
-                string += 'см.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-            if True: #Вычисление собственных моментов инерции участков
-                string = 'Собственные моменты инерции участков расчетного контура вычисляются по формулам:'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$I_{bx,0,i} = \\dfrac{L_{x,i}^3}{12}; \\quad I_{by,0,i} = \\dfrac{L_{y,i}^3}{12}.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-                string = 'Результаты расчета собственных моментов по указанным выше формулам приведены в таблице ниже.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                contours_I0 = {'Ibx0i, см3':[], 'Iby0i, см3':[]}
-                contours_I0_names = []
-                for i in range(len(contour_sides)):
-                    contours_I0_names.append(contour_sides[i])
-                    #contours_I0['Ix0i, см3'].append(f'{float(round())}')
-                    #contours_I0['Ix0i, см3'].append(n_number(rez["Ix0_arr"][i],2))
-                    #contours_I0['Ix0i, см3'].append(Decimal(round(rez["Ix0_arr"][i],2)).normalize())
-                    contours_I0['Ibx0i, см3'].append(f'{float(round(rez["Ix0_arr"][i],2))}')
-                    contours_I0['Iby0i, см3'].append(f'{float(round(rez["Iy0_arr"][i],2))}')
-                contours_I0 = pd.DataFrame.from_dict(contours_I0, orient='index', columns=contours_I0_names)
-                st.dataframe(contours_I0, use_container_width=True)
-                table = doc.add_table(contours_I0.shape[0]+1, contours_I0.shape[1]+1)
-                table.style = 'Стиль_таблицы'
-                for j in range(contours_I0.shape[-1]):
-                    table.cell(0,j+1).text = contours_I0.columns[j]
-                    table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                for i in range(contours_I0.shape[0]):
-                    for j in range(contours_I0.shape[-1]):
-                        table.cell(i+1,j+1).text = str(contours_I0.values[i,j])
-                        table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                table.cell(0,0).text = 'Участок'
-                table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(1,0).paragraphs[0]
-                add_math(p, 'I_{bx,0,i}, см^3')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-                #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                p = table.cell(2,0).paragraphs[0]
-                add_math(p, 'I_{by,0,i}, см^3')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-
-            if True: #Вычисление моментов инерции участков
-                string = 'Для вычисления моментов инерции участков контура относительно геометрического центра всего контура используются формулы переноса осей, приведенные ниже.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$I_{bx,i} = I_{bx,0,i} +  L_i \\cdot x_{c,i}^2; \\quad I_{by,i} = I_{by,0,i} +  L_i \\cdot y_{c,i}^2.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-                string = 'Результаты расчета моментов инерции участков контура относительно геометрического центра всего контура по указанным выше формулам приведены в таблице ниже.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                contours_I = {'Ibxi, см3':[], 'Ibyi, см3':[]}
-                contours_I_names = []
-                #st.write(rez["Ix_arr"])
-                for i in range(len(contour_sides)):
-                    contours_I_names.append(contour_sides[i])
-                    #contours_I['Ixi, см3'].append(f'{float(round(rez["Ix_arr"][i],2)):g}')
-                    #contours_I['Iyi, см3'].append(f'{float(round(rez["Iy_arr"][i],2)):g}')
-                    contours_I['Ibxi, см3'].append(f'{float(round(rez["Ix_arr"][i],2))}')
-                    contours_I['Ibyi, см3'].append(f'{float(round(rez["Iy_arr"][i],2))}')
-                contours_I = pd.DataFrame.from_dict(contours_I, orient='index', columns=contours_I_names)
-                st.dataframe(contours_I, use_container_width=True)
-                table = doc.add_table(contours_I.shape[0]+1, contours_I.shape[1]+1)
-                table.style = 'Стиль_таблицы'
-                for j in range(contours_I.shape[-1]):
-                    table.cell(0,j+1).text = contours_I.columns[j]
-                    table.cell(0,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                for i in range(contours_I.shape[0]):
-                    for j in range(contours_I.shape[-1]):
-                        table.cell(i+1,j+1).text = str(contours_I.values[i,j])
-                        table.cell(i+1,j+1).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                table.cell(0,0).text = 'Участок'
-                table.cell(0,0).paragraphs[0].paragraph_format.first_line_indent = Mm(0)
-                p = table.cell(1,0).paragraphs[0]
-                add_math(p, 'I_{bx,i}, см^3')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-                #p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                p = table.cell(2,0).paragraphs[0]
-                add_math(p, 'I_{by,i}, см^3')
-                p.add_run(' ')
-                p.paragraph_format.first_line_indent = Mm(0)
-
-            if True: #Моменты инерции всего сечения
-                string = 'Моменты инерции всего расчетного контура вычисляем как сумму моментов инерции каждого из участков.'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$ I_{bx} = \\sum_i{I_{bx,i}}= '
-                #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
-                string += f'{float(round(rez["Ix_arr"][0],2))}'
-                for i in range(1, len(rez["Ix_arr"])):
-                    if rez["Ix_arr"][i] > 0:
-                        string += '+'
-                    #string += f'{float(round(rez["Ix_arr"][i],2)):g}'
-                    string += f'{float(round(rez["Ix_arr"][i],2))}'
-                #string += f'={float(round(rez["Ix"],2)):g} \\cdot см^3.$'
-                string += f'={float(round(rez["Ix"],2))} \\cdot см^3.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-                string = '$ I_{by} = \\sum_i{I_{by,i}}= '
-                #string += f'{float(round(rez["Iy_arr"][0],2)):g}'
-                string += f'{float(round(rez["Iy_arr"][0],2))}'
-                for i in range(1, len(rez["Iy_arr"])):
-                    if rez["Iy_arr"][i] > 0:
-                        string += '+'
-                    #string += f'{float(round(rez["Iy_arr"][i],2)):g}'
-                    string += f'{float(round(rez["Iy_arr"][i],2))}'
-                #string += f'={float(round(rez["Iy"],2)):g} \\cdot см^3.$'
-                string += f'={float(round(rez["Iy"],2))} \\cdot см^3.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-            if True: #Моменты сопротивления расчетного контура
-                string = 'Моменты сопротивления расчетного контура вычисляются по формулам (8.98):'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$ W_{bx} = \\dfrac{I_{bx}}{x_{\\max}} = \\dfrac{'
-                #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
-                string += f'{float(round(rez["Ix"],2))}'
-                string += '}{'
-                string += f'{float(round(rez["xmax"],3))}'
-                string += '} = '
-                string += f'{float(round(rez["Wxmin"],2))}'
-                string += '\\cdot см^2.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-
-                string = '$ W_{by} = \\dfrac{I_{by}}{y_{\\max}} = \\dfrac{'
-                #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
-                string += f'{float(round(rez["Iy"],2))}'
-                string += '}{'
-                string += f'{float(round(rez["ymax"],3))}'
-                string += '} = '
-                string += f'{float(round(rez["Wymin"],2))}'
-                string += '\\cdot см^2.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-    
-        else: #Краткий расчет
-            if True: #Периметр расчетного контура
-                string = 'Геометрические характеристики, такие как осевые моменты инерции и моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = 'Периметр расчетного контура:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = f'$u = {float(round(sum(contour_len),3)):g} \\cdot см.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-            if True: #Центра тяжести
-                string = 'Координаты центра тяжести контура относительно левого нижнего угла колонны:'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = f'$ x_c =  {float(round(rez["xc"],3)):g} \\cdot см; \\quad  y_c = {float(round(rez["yc"],3)):g} \\cdot см.$'
-                st.write(string)
-                add_math(doc.add_paragraph(), string.replace('$',''))
-        
-            if True: #Эксцентриситет продольной силы
-                if rez["ex"] !=0 or rez["ey"] !=0:
-                    string = 'Эксцентриситеты продольной силы:'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-                    string = '$'
-                    if rez["ex"] !=0:
-                        string += f'e_x = {float(rez["ex"]):g} \\cdot см'
-                    if rez["ey"] !=0:
-                        if rez["ex"] !=0:
-                            string += '; \\quad '
-                        string += f'e_y = {float(rez["ey"]):g} \\cdot см'
-                    string += '.$'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-
-            if True: #Вычисление наиболее удаленных точек
-                string = 'Расстояние до наиболее удаленных от центра тяжести точек расчетного контура составляет:'
-                st.write(string)
-                doc.add_paragraph().add_run(string)
-                string = '$x_{\\max} = '
-                string += str(rez["xmax"])
-                string += 'см; \\quad y_{\\max} ='
-                string += str(rez["ymax"])
-                string += 'см.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-            if True: #Моменты инерции всего сечения
-                string = 'Моменты инерции расчетного контура:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = '$ I_{bx} = '
-                string += f'{rez["Ix"]} \\cdot см^3; \\quad'
-                string += ' I_{by} = '
-                string += f'{rez["Iy"]} \\cdot см^3.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-            if True: #Моменты сопротивления расчетного контура
-                string = 'Моменты сопротивления расчетного контура:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = '$ W_{bx} = ' + str(rez["Wxmin"]) + '\\cdot см^2; \\quad'
-                string += ' W_{by} = ' + str(rez["Wymin"]) + '\\cdot см^2.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-    with st.expander('Предельные усилия, воспринимаемые бетоном'):
-        if True: #Предельная продавливающая сила, воспринимаемая бетоном
-            string = 'Предельные усилия, воспринимаемые бетоном.'
-            st.subheader(string)
-            doc.add_heading(string, level=1)
-            string = 'Предельную продавливающую силу, воспринимаемую бетоном $F_{b,ult}$, вычисляем по формуле (8.88) с учетом формулы (8.89):'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = '$F_{b,ult} = R_{bt} \\cdot h_0 \\cdot u = '
-            string += f'{float(round(Rbt,6)):g} \\cdot {float(round(h0,5)):g} \\cdot  {float(sum(contour_len)):g} ='
-            string += f'{float(round(rez["Fbult"],1)):g} \\cdot тс.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-            string = 'Предельно допустимое значение продавливающей силы (с учетом положений п. 8.1.46), при которой допускается не учитывать изгибающие моменты:'
-            st.write(string)
-            doc.add_paragraph().add_run(string)
-            string = '$F_{b,ult}/1.5 = '
-            string += f'{float(round(rez["Fbult"]/1.5,1)):g} \\cdot тс.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-        if True: #Предельные моменты, воспринимаемые бетонным сечением
-            string = 'Предельные моменты, воспринимаемые бетоном в расчетном поперечном сечении, вычисляются по формулам (8.94):'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = '$ M_{bx,ult} = R_{bt} \\cdot h_0 \\cdot W_{bx} = '
-            #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
-            string += f'{float(round(Rbt,6)):g} \\cdot {float(round(h0,5)):g} \\cdot  {float(round(rez["Wxmin"],2))} / 100 ='
-            string += f'{float(round(rez["Mbxult"],2))} \\cdot тсм.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-            string = '$ M_{by,ult} = R_{bt} \\cdot h_0 \\cdot W_{by} = '
-            #string += f'{float(round(rez["Ix_arr"][0],2)):g}'
-            string += f'{float(round(Rbt,6)):g} \\cdot {float(round(h0,5)):g} \\cdot  {float(round(rez["Wymin"],2))} / 100 ='
-            string += f'{float(round(rez["Mbyult"],2))} \\cdot тсм.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-            string = 'Примечание. Деление на 100 в данных формулах необходимо для перевода сантиметров в метры.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-    with st.expander('Вычисление усилий, учитываемых в расчете'):
-        string = 'Усилия, учитываемые в расчете.'
-        st.subheader(string)
-        doc.add_heading(string, level=1)
-        string = 'Сосредоточенная сила, направленная ' + str(F_dir) + ' $F=' + str(F0) + '\\cdot тс$.'
-        st.write(string)
-        add_text_latex(doc.add_paragraph(), string)
-
-        string = 'Сосредоточенные моменты.'
-        st.write(string)
-        add_text_latex(doc.add_paragraph(), string)
-
-        if rez["ex"] !=0: #Если есть эксцентриситет вдоль х
-            if M_abs: #Если считаем момент от эксцентриситета всегда догружающим
-                if delta_M_exc: #Если учитываем дельта к эксцентриситету
-                    string = '$M_x = (|M_{x,loc}| + F \\cdot |e_x|) \\cdot \\delta_{Mx} = '
-                    string += '(|' + str(Mxloc) + '| + ' + str(F0) + '\\cdot |' + str(rez['ex']) + '/100|) \\cdot ' + str(deltaMx) +  ' =  ' + str(rez['Mx']) 
-                else:  #Если не учитываем дельта к эксцентриситету
-                    string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} + F \\cdot |e_x|  = '
-                    string += '|' + str(Mxloc) + '| \\cdot'  + str(deltaMx) + ' + ' + str(F0) + '\\cdot |' + str(rez['ex']) + '/100| '  ' =  ' + str(rez['Mx']) 
-            else: #Если учитываем знаки моментов
-                if F_dir == 'вверх': znak = '+'
-                if F_dir == 'вниз': znak = '-'
-                if delta_M_exc: #Если учитываем дельта к эксцентриситету
-                    string = '$M_x = |M_{x,loc}' + znak +  'F \\cdot e_x| \\cdot \\delta_{Mx} = '
-                    string += '|' + str(Mxloc) + znak + str(F0) + '\\cdot ' 
-                    if rez['ex'] <0: string += '(' +  str(rez['ex'])  + ')'
-                    else: string += str(rez['ex'])
-                    string += '/100| \\cdot ' + str(deltaMx) +  ' =  ' + str(rez['Mx']) 
-                else:  #Если не учитываем дельта к эксцентриситету
-                    string = '$M_x = |M_{x,loc} \\cdot \\delta_{Mx}' + znak +  'F \\cdot e_x|  = '
-                    string += '|' + str(Mxloc) + ' \\cdot'  + str(deltaMx) + znak + str(F0) + '\\cdot '
-                    if rez['ex'] <0: string += '(' +  str(rez['ex'])  + ')'
-                    else: string += str(rez['ex'])
-                    string +=  '/100| '  ' =  ' + str(rez['Mx']) 
-            string +=  '\\cdot тсм.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-        if rez["ey"] !=0: #Если есть эксцентриситет вдоль х
-            if M_abs: #Если считаем момент от эксцентриситета всегда догружающим
-                if delta_M_exc: #Если учитываем дельта к эксцентриситету
-                    string = '$M_y = (|M_{y,loc}| + F \\cdot |e_y|) \\cdot \\delta_{My} = '
-                    string += '(|' + str(Myloc) + '| + ' + str(F0) + '\\cdot |' + str(rez['ey']) + '/100|) \\cdot ' + str(deltaMy) +  ' =  ' + str(rez['My']) 
-                else:  #Если не учитываем дельта к эксцентриситету
-                    string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} + F \\cdot |e_y|  = '
-                    string += '|' + str(Myloc) + '| \\cdot'  + str(deltaMy) + ' + ' + str(F0) + '\\cdot |' + str(rez['ey']) + '/100| '  ' =  ' + str(rez['My']) 
-            else: #Если учитываем знаки моментов
-                if F_dir == 'вверх': znak = '+'
-                if F_dir == 'вниз': znak = '-'
-                if delta_M_exc: #Если учитываем дельта к эксцентриситету
-                    string = '$M_y = |M_{y,loc}' + znak +  'F \\cdot e_y| \\cdot \\delta_{My} = '
-                    string += '|' + str(Myloc) + znak + str(F0) + '\\cdot ' 
-                    if rez['ey'] <0: string += '(' +  str(rez['ey'])  + ')'
-                    else: string += str(rez['ey'])
-                    string += '/100| \\cdot ' + str(deltaMy) +  ' =  ' + str(rez['My']) 
-                else:  #Если не учитываем дельта к эксцентриситету
-                    string = '$M_y = |M_{y,loc} \\cdot \\delta_{My}' + znak +  'F \\cdot e_y|  = '
-                    string += '|' + str(Myloc) + ' \\cdot'  + str(deltaMy) + znak + str(F0) + '\\cdot '
-                    if rez['ey'] <0: string += '(' +  str(rez['ey'])  + ')'
-                    else: string += str(rez['ey'])
-                    string +=  '/100| '  ' =  ' + str(rez['My']) 
-            string +=  '\\cdot тсм.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-    
-        if rez["ex"] !=0 or rez["ey"] !=0:
-            string = 'Примечание. Деление на 100 необходимо для перевода сантиметров в метры.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-        if rez["ex"] == 0:
-            string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} = | ' + str(Mxloc) +'| \\cdot ' + str(deltaMx) + '=' + str(rez['Mx']) +  '\\cdot тсм.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-        if rez["ey"] == 0:
-            string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} = | ' + str(Myloc) +'| \\cdot ' + str(deltaMy) + '=' + str(rez['My']) +  '\\cdot тсм.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-    with st.expander('Проверка прочности по бетону'):
-        string = 'Проверка прочности бетона расчетного поперечного сечения.'
-        st.subheader(string)
-        doc.add_heading(string, level=1)
-        if True: #Проверка по продольной силе
-            string = 'Коэффициент использования прочности бетона расчетного поперечного сечения по силе:'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = '$k_{b,F}=\\dfrac{F}{F_{b,ult}}=\\dfrac{'
-            string += str(F0) + '}{' + str(rez['Fbult']) + '} = ' + str(rez['kbF']) + '.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-        if True: #Проверка по моментам
-            string = 'Коэффициент использования прочности бетона расчетного поперечного сечения по моментам:'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = '$k_{b,M}=\\dfrac{M_x}{M_{bx,ult}} + \\dfrac{M_y}{M_{by,ult}} =\\dfrac{'
-            string += str(rez['Mx']) + '}{' + str(rez['Mbxult']) + '} +  \\dfrac{' + str(rez['My']) + '}{' + str(rez['Mbyult'])
-            string += '}=' + str(rez['kbM0']) + '.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            if rez['kbM0'] != rez['kbM']:
-                string = 'Условие $k_{b,M} \\le 0.5 \\cdot k_{b,F}$ не выполняется. Вклад моментов ограничивается в соответствии с указаниями п. 8.1.46.'
-                string += ' В расчете принимаем:'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-                string = '$k_{b,M} = 0.5 \\cdot k_{b,F} =' + str(rez['kbM']) + '.$'
-                st.write(string)
-                add_text_latex(doc.add_paragraph(), string)
-
-        if True: #Суммарно
-            string = 'Суммарный (по силе и моментам) коэффициент использования прочности бетона расчетного поперечного сечения:'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-            string = '$k_b=k_{b,F}+k_{b,M}=' + str(rez['kbF']) + '+' + str(rez['kbM']) + '=' + str(rez['kb']) + '.$'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-        st.write()
-
-    if True: #Результаты проверки прочности по бетону
-        if rez['kb'] <= 1:
-            string = 'Так как $k_{b}=' + str(rez['kb'])+ '<1$ прочность обеспечена без установки поперечной арматуры.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-        if rez['kb'] > 2:
-            string = 'Так как $k_{b}=' + str(rez['kb'])+ '>2$ прочность не может быть обеспечена, необходимо увеличение габаритов площадки передачи нагрузки, либо толщины плиты, либо класса бетона.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-        if 1 < rez['kb'] <= 2:
-            string = 'Так как $1< k_{b}=' + str(rez['kb'])+  ' \\le 2$ требуется установка поперечной арматуры.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
-
-    if rez['kb'] <=2: #Если прочность может быть обеспечена
-        if is_sw: #Предельные усилия, воспринимаемые заданной арматурой
-            if sw_mode == 'проверка':
-                with st.expander('Предельные усилия, воспринимаемые арматурой'):
-                    string = 'Предельные усилия, воспринимаемые поперечной арматурой.'
-                    st.subheader(string)
-                    doc.add_heading(string, level=1)
-                    string = 'Предельная продавливающая сила, воспринимаемая поперечной арматурой $F_{sw,ult}$, вычисляется по формуле (8.91):'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-                
-                    string = '$F_{sw,ult} = 0.8 \\cdot q_{sw} \\cdot u = '
-                    string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Lsum']) + '='
-                    string += str(rez['Fswult_check0']) + '\\cdot тс.$'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-
-                    if rez['Fswult_check0'] >= 0.25*rez['Fbult']:
-                        string = 'Условие $F_{sw,ult}  = ' + str(rez['Fswult_check0']) +  ' \\ge 0.25 \\cdot F_{b,ult} =' + str(round(0.25*rez['Fbult'],1)) +  ' $ выполняется.'
-                        string += ' Поперечная арматура учитывается в расчете.'
-                        if rez['Fswult_check0']<rez['Fbult']:
-                            string += ' Условие $F_{sw,ult}  = ' + str(rez['Fswult_check0']) +  ' \\le F_{b,ult} =' + str(rez['Fbult']) +  ' $ выполняется.'
-                            string += ' Вклад поперечного армирования не ограничивается.'
-                        
-                        if rez['Fswult_check0']>rez['Fbult']:
-                            string += ' Условие $F_{sw,ult} \\le F_{b,ult}$ не выполняется, вклад поперечного армирования ограничиваем. В расчете принимаем: '
-                            string += '$F_{sw,ult} = F_{b,ult}=' + str(rez['Fswult_check']) +  '\\cdot тс.$'
-
-                    if rez['Fswult_check0']<0.25*rez['Fbult']:
-                        string = 'Так как $F_{sw,ult} \\le 0.25 \\cdot F_{b,ult} = ' + str(round(0.25*rez['Fbult'],1)) + '$ , поперечную арматуру не учитываем в расчете. В расчете принимаем:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$F_{sw,ult} = M_{sw,x,ult} = M_{sw,y,ult} = 0.$'
-
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-
-                    if rez['Fswult_check0']>=0.25*rez['Fbult']:
-                        string = 'Предельные моменты, воспринимаемые поперечной арматурой, вычисляются по формуле (8.97):'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-
-                        string = '$M_{sw,ult}= 0.8 \\cdot q_{sw} \\cdot W_{sw}.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-
-                        string = 'В соответствии с п. 8.1.52, принято, что поперечная арматура расположена равномерно вдоль расчетного контура продавливания, т.е. $W_{sw}=W_b$. В результате:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-
-                        string = '$M_{sw,x,ult}= 0.8 \\cdot q_{sw} \\cdot W_{bx} = '
-                        string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Wxmin']) + '/100='
-                        string += str(rez['Mswxult_check0']) + '\\cdot тсм;$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$ M_{sw,y,ult}= 0.8 \\cdot q_{sw} \\cdot W_{by} = '
-                        string += '0.8 \\cdot' + str(qsw0) + '\\cdot' + str(rez['Wymin']) + '/100='
-                        string += str(rez['Mswyult_check0']) + '\\cdot тсм.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = 'Примечание. Деление на 100 в данных формулах необходимо для перевода сантиметров в метры.'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-
-                        if qsw0>qsw:
-                            string = 'Так как $M_{sw,x,ult} \\ge M_{bx,ult}$ и $M_{sw,y,ult} \\ge M_{by,ult}$, вклад поперечного армирования ограничиваем. В расчете принимаем:'
-                            st.write(string)
-                            add_text_latex(doc.add_paragraph(), string)
-                            string = '$M_{sw,x,ult} = M_{bx,ult}=' + str(rez['Mswxult_check']) +  '\\cdot тсм; \\quad'
-                            string += ' M_{sw,y,ult} = M_{by,ult}=' + str(rez['Mswyult_check'])
-                            string += '\\cdot тсм.$'
-                            st.write(string)
-                            add_text_latex(doc.add_paragraph(), string)
-
-                with st.expander('Проверка прочности с поперечной арматурой'):
-                    string = 'Проверка прочности бетона расчетного поперечного сечения.'
-                    st.subheader(string)
-                    doc.add_heading(string, level=1)
-                    if True: #Проверка по продольной силе
-                        string = 'Коэффициент использования прочности расчетного поперечного сечения по силе:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$k_{F}=\\dfrac{F}{F_{b,ult} + F_{sw,ult}}=\\dfrac{'
-                        string += str(F0) + '}{' + str(rez['Fbult']) + '+' + str(rez['Fswult_check']) + '} = ' + str(rez['kF_check']) + '.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                    if True: #Проверка по моментам
-                        string = 'Коэффициент использования прочности расчетного поперечного сечения по моментам:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$k_{M}=\\dfrac{M_x}{M_{bx,ult} + M_{sw,x,ult}} + \\dfrac{M_y}{M_{by,ult} + M_{sw,y,ult}} =\\dfrac{'
-                        string += str(rez['Mx']) + '}{' + str(rez['Mbxult']) + '+' + str(rez['Mswxult_check']) + '} +  \\dfrac{' + str(rez['My']) + '}{' + str(rez['Mbyult'])  + '+' + str(rez['Mswyult_check'])
-                        string += '}=' + str(rez['kM0_check']) + '.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        if rez['kM0_check'] != rez['kM_check']:
-                            string = 'Условие $k_{M} \\le 0.5 \\cdot k_{F}$ не выполняется. Вклад моментов ограничивается в соответствии с указаниями п. 8.1.46.'
-                            string += ' В расчете принимаем:'
-                            st.write(string)
-                            add_text_latex(doc.add_paragraph(), string)
-                            string = '$k_{M} = 0.5 \\cdot k_{F} =' + str(rez['kM_check']) + '.$'
-                            st.write(string)
-                            add_text_latex(doc.add_paragraph(), string)
-
-                    if True: #Суммарно
-                        string = 'Суммарный (по силе и моментам) коэффициент использования прочности расчетного поперечного сечения:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$k=k_{F}+k_{M}=' + str(rez['kF_check']) + '+' + str(rez['kM_check']) + '=' + str(rez['k_check']) + '.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                if True: #Результаты проверки прочности с арматурой
-                    if rez['k_check'] <= 1:
-                        string = 'Так как $k=' + str(rez['k_check'])+ '<1$ прочность обеспечена.'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                    if rez['k_check'] > 1:
-                        string = 'Так как $k=' + str(rez['k_check'])+ '>1$ прочность не обеспечена, необходимо увеличение поперечного армирования.'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = 'Минимальное значение $A_{sw}/s_{w}=' + str(rez['sw_Asw_min']) + ' \\cdot см^2 / см.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = 'При заданном шаге рядов поперечного армирования и числе стержней, пересекающих пирамиду продавливания, минимальный диаметр стержня составляет $' + str(rez['dsw_min']) + ' \\cdot мм.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                    string = 'При заданном шаге рядов поперечного армирования и числе стержней, пересекающих пирамиду продавливания, максимальный диаметр стержня составляет $' + str(rez['dsw_max']) + ' \\cdot мм.$'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-
-
-            if sw_mode == 'подбор':
-                if rez['kb'] <= 1: #Если поперечная арматура не требуется
-                    string = 'Поперечная арматура не требуется.'
-                    st.write(string)
-                    add_text_latex(doc.add_paragraph(), string)
-                if rez['kb'] > 1: #Если поперечная арматура требуется
-                    with st.expander('Расчет требуемого поперечного армирования'):
-                        string = 'Требуемая интенсивность поперечного армирования.'
-                        st.subheader(string)
-                        doc.add_heading(string, level=1)
-                        string = 'Минимальное значение $A_{sw}/s_{w}$ вычисляется по формуле:'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        string = '$\\dfrac{A_{sw}}{s_{w}} = \\dfrac{R_{bt} \\cdot h_0 \\cdot (k_b - 1)}{0.8 \\cdot R_{sw}}='
-                        string += ' \\dfrac{' + str(Rbt)  + ' \\cdot ' +  str(h0) + ' \\cdot (' + str(rez['kb']) +  '- 1)}{0.8 \\cdot ' + str(Rsw) +'}=' + str(rez['sw_Asw_min'])
-                        string += ' \\cdot см^2 / см.$'
-                        st.write(string)
-                        add_text_latex(doc.add_paragraph(), string)
-                        solve_d = solve_arm(rez['sw_Asw_min'], h0, dx, dy)
-                        col_names = solve_d[1]
-                        row_names = solve_d[0]
-                        for i in range(len(col_names)):
-                            col_names[i] = 'sw=' + str(col_names[i]) + 'см'
-                        for i in range(len(row_names)):
-                            row_names[i] = 'nsw=' + str(row_names[i]) + 'шт'
-                        st.write(pd.DataFrame(solve_d[2],index=row_names,columns=col_names))
-                        #st.write(rez)
-
-            st.plotly_chart(fig_sw)
+   
+    #st.plotly_chart(fig_sw)
 
 
 
-    cols = st.columns([1,1,1])
-
-    #cols[0].write()
-
-    #st.write('Коэффициент использования по продольной силе $k_{bF}=' + str(rez['kbF']) + '$.')
-    #st.write('Коэффициент использования по моментам $k_{bМ}=' + str(rez['kbM']) + '$.')
-    #st.write('Суммарный коэффициент использования $k_b=' + str(rez['kb']) + '$.')
 
     file_stream = io.BytesIO()
     doc.save(file_stream)
