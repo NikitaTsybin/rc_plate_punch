@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from docx.shared import Mm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.table import WD_ALIGN_VERTICAL
 from punch_word_func import *
 import os
 import sys
@@ -170,7 +172,7 @@ def report_init_data(result, doc): #Печать исходных данных
         p.paragraph_format.first_line_indent = Mm(0)
         p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p00 = doc.add_paragraph()
-        p00.style = 'Рис. 3'
+        p00.style = 'Рис. 2'
         p00.add_run('Положительные направления действующих усилий')
 
         string = 'Сосредоточенная сила $F=' + str(result['F0']) + ' тс$, направленная ' + result['F_dir'] + '.'
@@ -563,19 +565,21 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
 
         if fig_Aq:
             table = doc.add_table(1, 2)
+            table.cell(0,0).vertical_alignment = WD_ALIGN_VERTICAL.BOTTOM
+            table.cell(0,1).vertical_alignment = WD_ALIGN_VERTICAL.BOTTOM
             p0 = table.cell(0,0).paragraphs[0]
             p0.add_run().add_picture(fig, height=Mm(90))
             p0.paragraph_format.first_line_indent = Mm(0)
             p0.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p00 = table.cell(0,0).add_paragraph()
-            p00.style = 'Рис. 3'
+            p00.style = 'Рис. 2'
             p00.add_run('Эскиз расчетного контура')
             p1 = table.cell(0,1).paragraphs[0]
             p1.add_run().add_picture(fig_Aq, height=Mm(45))
             p1.paragraph_format.first_line_indent = Mm(0)
             p1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p10 = table.cell(0,1).add_paragraph()
-            p10.style = 'Рис. 3'
+            p10.style = 'Рис. 2'
             p10.add_run('Габариты наибольшего основания пирамиды продавливания')
         else:
             p = doc.add_paragraph()
@@ -583,7 +587,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
             p.paragraph_format.first_line_indent = Mm(0)
             p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p =  doc.add_paragraph()
-            p.style = 'Рис. 3'
+            p.style = 'Рис. 2'
             p.add_run('Эскиз расчетного контура')
 
         if True: #Длины участков
@@ -969,19 +973,21 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
         st.write(string)
         if fig_Aq:
             table = doc.add_table(1, 2)
+            table.cell(0,0).vertical_alignment = WD_ALIGN_VERTICAL.BOTTOM
+            table.cell(0,1).vertical_alignment = WD_ALIGN_VERTICAL.BOTTOM
             p0 = table.cell(0,0).paragraphs[0]
             p0.add_run().add_picture(fig, height=Mm(90))
             p0.paragraph_format.first_line_indent = Mm(0)
             p0.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p00 = table.cell(0,0).add_paragraph()
-            p00.style = 'Рис. 3'
+            p00.style = 'Рис. 2'
             p00.add_run('Эскиз расчетного контура')
             p1 = table.cell(0,1).paragraphs[0]
             p1.add_run().add_picture(fig_Aq, height=Mm(45))
             p1.paragraph_format.first_line_indent = Mm(0)
             p1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p10 = table.cell(0,1).add_paragraph()
-            p10.style = 'Рис. 3'
+            p10.style = 'Рис. 2'
             p10.add_run('Габариты наибольшего основания пирамиды продавливания')
         else:
             p = doc.add_paragraph()
@@ -989,7 +995,7 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
             p.paragraph_format.first_line_indent = Mm(0)
             p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p =  doc.add_paragraph()
-            p.style = 'Рис. 3'
+            p.style = 'Рис. 2'
             p.add_run('Эскиз расчетного контура')
 
         if True: #Периметр расчетного контура
@@ -1385,3 +1391,280 @@ def report_full_strength (result, doc): #Прочность по c попере�
                    string += ' и $k_b=' + str(result['kb']) + '>2$, прочность не может быть обеспечена, необходимо увеличение габаритов колонны, толщины плиты или класса бетона.'
                st.write(string)
                add_text_latex(doc.add_paragraph(), string)
+
+def report_second_contour(result, doc, fig_doc, fig_show, fig_doc_Aq=None,  fig_show_Aq=None):
+    with st.expander('Проверка за зоной поперечного армирования'):
+        string = 'Геометрические характеристики контура, проверяемого без учета поперечного армирования.'
+        st.subheader(string)
+        doc.add_heading(string, level=2)
+        if fig_doc_Aq:
+            cols11 = st.columns([1,1])
+            cols11[0].plotly_chart(fig_show)
+            cols11[1].plotly_chart(fig_show_Aq)
+            table = doc.add_table(1, 2)
+            table.cell(0,0).vertical_alignment = WD_ALIGN_VERTICAL.BOTTOM
+            table.cell(0,1).vertical_alignment = WD_ALIGN_VERTICAL.BOTTOM
+            p0 = table.cell(0,0).paragraphs[0]
+            p0.add_run().add_picture(fig_doc, height=Mm(90))
+            p0.paragraph_format.first_line_indent = Mm(0)
+            p0.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p00 = table.cell(0,0).add_paragraph()
+            p00.style = 'Рис. 2'
+            p00.add_run('Эскиз расчетного контура')
+            p1 = table.cell(0,1).paragraphs[0]
+            p1.add_run().add_picture(fig_doc_Aq, height=Mm(45))
+            p1.paragraph_format.first_line_indent = Mm(0)
+            p1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p10 = table.cell(0,1).add_paragraph()
+            p10.style = 'Рис. 2'
+            p10.add_run('Габариты наибольшего основания пирамиды продавливания')
+        else:
+            st.plotly_chart(fig_show)
+            p = doc.add_paragraph()
+            p.add_run().add_picture(fig_doc, width=Mm(80))
+            p.paragraph_format.first_line_indent = Mm(0)
+            p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p =  doc.add_paragraph()
+            p.style = 'Рис. 2'
+            p.add_run('Эскиз расчетного контура')
+    
+        if True: #Периметр расчетного контура
+            #string = 'Геометрические характеристики, такие как осевые моменты инерции и моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
+            #st.write(string)
+            #add_text_latex(doc.add_paragraph(), string)
+            string = 'Периметр расчетного контура:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$u = ' + str(result['u']) + ' см.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Центра тяжести
+            string = 'Координаты центра тяжести контура относительно левого нижнего угла колонны:'
+            st.write(string)
+            doc.add_paragraph().add_run(string)
+            string = '$ x_c = ' + str(result['xc']) + ' см; \\quad  y_c = ' + str(result['yc']) + ' см.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+        
+        if True: #Эксцентриситет продольной силы
+            if result["ex"] !=0 or result["ey"] !=0:
+                string = 'Эксцентриситеты продольной силы:'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+                string = '$'
+                if result["ex"] !=0:
+                    string += 'e_x = ' + str(result["ex"]) +  ' см'
+                if result["ey"] !=0:
+                    if result["ex"] !=0:
+                        string += '; \\quad '
+                    string += 'e_y = ' + str(result["ey"]) +  ' см'
+                string += '.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Вычисление наиболее удаленных точек
+            string = 'Расстояние до наиболее удаленных от центра тяжести точек расчетного контура составляет:'
+            st.write(string)
+            doc.add_paragraph().add_run(string)
+            string = '$x_{\\max} = ' + str(result["xmax"]) + ' см; \\quad '
+            string += ' y_{\\max} =' + str(result["ymax"]) + ' см.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Моменты инерции всего сечения
+            string = 'Моменты инерции расчетного контура:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$ I_{bx} = ' + str(result["Ix"]) + ' см^3; \\quad '
+            string += ' I_{by} = '  + str(result["Iy"]) + ' см^3.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Моменты сопротивления расчетного контура
+            string = 'Моменты сопротивления расчетного контура:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$ W_{bx} = ' + str(result["Wx"]) + ' см^2; \\quad'
+            string += ' W_{by} = ' + str(result["Wy"]) + ' см^2.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+        
+        if True: #Усилия, учитываемы в расчете
+            string = 'Усилия, учитываемые в расчете.'
+            st.subheader(string)
+            doc.add_heading(string, level=2)
+            string = 'Сосредоточенная сила, направленная ' + str(result['F_dir']) + ' $F=' + str(result['F0']) + ' тс$.'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            if round(abs(result['Fq']), 1) != 0.0:
+                string = 'Разгружающая сила $F_q = q \\cdot A_q = ' + str(result['q']) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + ' тс$.'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+                string = 'В расчете принимаем $F = F - F_q = ' + str(result['F0']) + '-' + str(result['Fq']) + '=' + str(result['F']) + ' тс$.'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+            string = 'Сосредоточенные моменты.'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+            if result["ex"] !=0: #Если есть эксцентриситет вдоль х
+                if result['M_abs']: #Если считаем момент от эксцентриситета всегда догружающим
+                    if result['delta_M_exc']: #Если учитываем дельта к эксцентриситету
+                        string = '$M_x = (|M_{x,loc}| + F \\cdot |e_x|) \\cdot \\delta_{Mx} = '
+                        string += '(|' + str(result['Mxloc']) + '| + ' + str(result['F']) + '\\cdot |' + str(result['ex']) + '/100|) \\cdot ' + str(result['deltaMx']) +  ' =  ' + str(result['Mx']) 
+                    else:  #Если не учитываем дельта к эксцентриситету
+                        string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} + F \\cdot |e_x|  = '
+                        string += '|' + str(result['Mxloc']) + '| \\cdot'  + str(result['deltaMx']) + ' + ' + str(result['F']) + '\\cdot |' + str(result['ex']) + '/100| '  ' =  ' + str(result['Mx']) 
+                else: #Если учитываем знаки моментов
+                    if result['F_dir'] == 'вверх': znak = '+'
+                    if result['F_dir'] == 'вниз': znak = '-'
+                    if result['delta_M_exc']: #Если учитываем дельта к эксцентриситету
+                        string = '$M_x = |M_{x,loc}' + znak +  'F \\cdot e_x| \\cdot \\delta_{Mx} = '
+                        string += '|' + str(result['Mxloc']) + znak + str(result['F']) + '\\cdot ' 
+                        if result['ex'] <0: string += '(' +  str(result['ex'])  + ')'
+                        else: string += str(result['ex'])
+                        string += '/100| \\cdot ' + str(result['deltaMx']) +  ' =  ' + str(result['Mx']) 
+                    else:  #Если не учитываем дельта к эксцентриситету
+                        string = '$M_x = |M_{x,loc} \\cdot \\delta_{Mx}' + znak +  'F \\cdot e_x|  = '
+                        string += '|' + str(result['Mxloc']) + ' \\cdot'  + str(result['deltaMx']) + znak + str(result['F']) + '\\cdot '
+                        if result['ex'] <0: string += '(' +  str(result['ex'])  + ')'
+                        else: string += str(result['ex'])
+                        string +=  '/100| '  ' =  ' + str(result['Mx']) 
+                string +=  ' тсм.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+            if result["ey"] !=0: #Если есть эксцентриситет вдоль х
+                if result['M_abs']: #Если считаем момент от эксцентриситета всегда догружающим
+                    if result['delta_M_exc']: #Если учитываем дельта к эксцентриситету
+                        string = '$M_y = (|M_{y,loc}| + F \\cdot |e_y|) \\cdot \\delta_{My} = '
+                        string += '(|' + str(result['Myloc']) + '| + ' + str(result['F']) + '\\cdot |' + str(result['ey']) + '/100|) \\cdot ' + str(result['deltaMy']) +  ' =  ' + str(result['My']) 
+                    else:  #Если не учитываем дельта к эксцентриситету
+                        string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} + F \\cdot |e_y|  = '
+                        string += '|' + str(result['Myloc']) + '| \\cdot'  + str(result['deltaMy']) + ' + ' + str(result['F']) + '\\cdot |' + str(result['ey']) + '/100| '  ' =  ' + str(result['My']) 
+                else: #Если учитываем знаки моментов
+                    if result['F_dir'] == 'вверх': znak = '+'
+                    if result['F_dir'] == 'вниз': znak = '-'
+                    if result['delta_M_exc']: #Если учитываем дельта к эксцентриситету
+                        string = '$M_y = |M_{y,loc}' + znak +  'F \\cdot e_y| \\cdot \\delta_{My} = '
+                        string += '|' + str(result['Myloc']) + znak + str(result['F']) + '\\cdot ' 
+                        if result['ey'] <0: string += '(' +  str(result['ey'])  + ')'
+                        else: string += str(result['ey'])
+                        string += '/100| \\cdot ' + str(result['deltaMy']) +  ' =  ' + str(result['My']) 
+                    else:  #Если не учитываем дельта к эксцентриситету
+                        string = '$M_y = |M_{y,loc} \\cdot \\delta_{My}' + znak +  'F \\cdot e_y|  = '
+                        string += '|' + str(result['Myloc']) + ' \\cdot'  + str(result['deltaMy']) + znak + str(result['F']) + '\\cdot '
+                        if result['ey'] <0: string += '(' +  str(result['ey'])  + ')'
+                        else: string += str(result['ey'])
+                        string +=  '/100| '  ' =  ' + str(result['My']) 
+                string +=  ' тсм.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+    
+            if result["ex"] !=0 or result["ey"] !=0:
+                string = 'Примечание: деление на 100 для перевода см в м.'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+            if result["ex"] == 0:
+                string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} = | ' + str(result['Mxloc']) +'| \\cdot ' + str(result['deltaMx']) + '=' + str(result['Mx']) +  ' тсм.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+            if result["ey"] == 0:
+                string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} = | ' + str(result['Myloc']) +'| \\cdot ' + str(result['deltaMy']) + '=' + str(result['My']) +  ' тсм.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Предельная продавливающая сила, воспринимаемая бетоном
+            string = 'Предельные усилия, воспринимаемые бетоном.'
+            st.subheader(string)
+            doc.add_heading(string, level=2)
+            string = 'Предельная сила, воспринимаемая бетоном $F_{b,ult}$, вычисляется по формуле (8.88) с учетом формулы (8.89):'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$F_{b,ult} = R_{bt} \\cdot h_0 \\cdot u = '
+            string += str(result['Rbt']) + ' \\cdot ' +  str(result['h0']) + ' \\cdot ' + str(result['u']) + ' = ' + str(result['Fbult']) + ' тс.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+            string = 'Предельно допустимое значение силы (с учетом положений п. 8.1.46), при которой допускается не учитывать изгибающие моменты:'
+            st.write(string)
+            doc.add_paragraph().add_run(string)
+            string = '$F_{b,ult}/1.5 = ' + str(result['Fbult']) + '/1.5 = ' +  str(round(result['Fbult']/1.5, 1)) + ' тс.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Предельные моменты, воспринимаемые бетонным сечением
+            string = 'Предельные моменты, воспринимаемые бетоном в расчетном поперечном сечении, вычисляются по формулам (8.94):'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$ M_{bx,ult} = R_{bt} \\cdot h_0 \\cdot W_{bx} = '
+            string += str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot ' + str(result['Wx']) + '/100 = ' + str(result['Mbxult']) + ' тсм;$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+            string = '$ M_{by,ult} = R_{bt} \\cdot h_0 \\cdot W_{by} = '
+            string += str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot ' + str(result['Wy']) + '/100 = ' + str(result['Mbyult']) + ' тсм.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+            string = 'Примечание: деление на 100 для перевода см в м.'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+
+        string = 'Проверка прочности бетона расчетного поперечного сечения.'
+        st.subheader(string)
+        doc.add_heading(string, level=2)
+        if True: #Проверка по продольной силе
+            string = 'Коэффициент использования прочности бетона расчетного поперечного сечения по силе:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$k_{b,F}=\\dfrac{F}{F_{b,ult}}=\\dfrac{'
+            string += str(result['F']) + '}{' + str(result['Fbult']) + '} = ' + str(result['kbF']) + '.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+        if True: #Проверка по моментам
+            string = 'Коэффициент использования прочности бетона по моментам:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$k_{b,M}=\\dfrac{M_x}{M_{bx,ult}} + \\dfrac{M_y}{M_{by,ult}} =\\dfrac{'
+            string += str(result['Mx']) + '}{' + str(result['Mbxult']) + '} +  \\dfrac{' + str(result['My']) + '}{' + str(result['Mbyult'])
+            string += '}=' + str(result['kbM0']) + '.$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            if result['kbM0'] != result['kbM']:
+                string = 'Условие $k_{b,M} \\le 0.5 \\cdot k_{b,F}$ не выполняется. Вклад моментов ограничивается в соответствии с указаниями п. 8.1.46.'
+                string += ' В расчете принимаем:'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+                string = '$k_{b,M} = 0.5 \\cdot k_{b,F} =' + str(result['kbM']) + '.$'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+        if True: #Суммарно
+            string = 'Суммарный коэффициент использования прочности бетона:'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+            string = '$k_b = k_{b,F} + k_{b,M}=' + str(result['kbF']) + ' + ' + str(result['kbM']) + ' = ' + str(result['kb']) + ' .$'
+            st.write(string)
+            add_text_latex(doc.add_paragraph(), string)
+        
+        if True: #Результаты проверки прочности по бетону
+            if result['kb'] <= 1:
+                string = 'Так как $k_{b}=' + str(result['kb'])+ '\\le 1$ прочность обеспечена без установки поперечной арматуры.'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+            if result['kb'] > 2:
+                string = 'Так как $k_{b}=' + str(result['kb'])+ '>2$ прочность не может быть обеспечена, необходимо увеличение габаритов площадки передачи нагрузки, либо толщины плиты, либо класса бетона.'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+            if 1 < result['kb'] <= 2:
+                string = 'Так как $1< k_{b}=' + str(result['kb'])+  ' \\le 2$ требуется установка поперечной арматуры.'
+                st.write(string)
+                add_text_latex(doc.add_paragraph(), string)
+
+
+

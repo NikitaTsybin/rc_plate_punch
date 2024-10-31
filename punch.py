@@ -216,12 +216,15 @@ fig, image_stream = draw_geometry(result) #геометрия для расче�
 fig_sw, image_stream_sw = draw_geometry(result_second) #геометрия для расчета за поперечной арматурой
 
 fig_Aq, image_stream_Aq = None, None
+fig_Aq_sw, image_stream_Aq_sw = None, None
 if result['Fq'] != 0.0:
     fig_Aq, image_stream_Aq = draw_Aq(result)
+    fig_Aq_sw, image_stream_Aq_sw = draw_Aq(result_second)
     st.sidebar.write('Габариты основания пирамиды')
     st.sidebar.plotly_chart(fig_Aq)
 
 cols[0].plotly_chart(fig)
+#st.sidebar.plotly_chart(fig_sw)
 
 #st.plotly_chart(fig_sw)
 
@@ -301,6 +304,10 @@ if is_report:
         #Расчет предельных усилий, воспринимаемых арматурой
         report_reinf_ultimate_forces(result, doc)
         report_full_strength(result, doc)
+
+    if result['is_sw']:
+        if result['sw_mode'] == 'проверка' or (result['sw_mode'] == 'подбор' and 2>= result['kb'] > 1):
+            report_second_contour(result_second, doc, image_stream_sw, fig_sw, image_stream_Aq_sw,  fig_Aq_sw)
 
    
     #st.plotly_chart(fig_sw)
