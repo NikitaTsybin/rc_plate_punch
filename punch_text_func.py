@@ -15,15 +15,15 @@ add_dir1 = ''
 def fast_report (result, result_second): #Быстрый отчет
     st.write('Расчетные усилия:')
     string = '$F = ' + str(result["F"]) +  '\\cdot тс; '
-    string += '\\quad M_x = ' + str(result["Mx"])+  '\\cdot тсм; '
-    string += '\\quad M_y = ' + str(result["My"])+  '\\cdot тсм.$'
+    string += '\\quad M_x = ' + str(result["Mx"])+  ' тсм; '
+    string += '\\quad M_y = ' + str(result["My"])+  ' тсм.$'
     if result['Fq'] != 0.0:
-        string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(result['q']) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + '\\cdot тс$.]'
+        string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(result['q']) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + ' тс$.]'
     st.write(string)
     st.write('Предельные усилия, воспринимаемые бетоном:')
     string = '$F_{b,ult} = ' + str(result["Fbult"]) +  '\\cdot тс; '
-    string += '\\quad M_{bx,ult} = ' + str(result["Mbxult"])+  '\\cdot тсм; '
-    string += '\\quad M_{by,ult} = ' + str(result["Mbyult"])+  '\\cdot тсм.$'
+    string += '\\quad M_{bx,ult} = ' + str(result["Mbxult"])+  ' тсм; '
+    string += '\\quad M_{by,ult} = ' + str(result["Mbyult"])+  ' тсм.$'
     st.write(string)
     st.write('Коэффициенты использования бетона по силе $k_{b,F}$, по моментам $k_{b,M}$ и суммарный $k_{b}$:')
     string = '$k_{b,F}='  + str(result['kbF'])
@@ -41,17 +41,17 @@ def fast_report (result, result_second): #Быстрый отчет
     if result['is_sw']:
         if 2>= result['kb']:
             if result['sw_mode'] == 'подбор' and result['kb']>1:
-                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(result['Asw']) + '\\cdot см^2$, составляет $s_w = ' + str(result['sw']) + '\\cdot см$.'
+                string = 'Максимальный шаг, при заданном $A_{sw} = ' + str(result['Asw']) + ' см^2$, составляет $s_w = ' + str(result['sw']) + ' см$.'
                 if result['sw_min_code'] == 1:
                     string += ' :blue[Учтено ограничение на максимальный шаг.]'
                 if result['kb_sw_code'] == 1:
                     string += ' :blue[Учтено требование $F_{sw,ult} \\ge 0.25 \\cdot F_{b,ult}$.]'
-                string += ' При данном шаге $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
+                string += ' При данном шаге $q_{sw} = ' + str(result['qsw']) + ' тс/см$.'
                 string += ' Вклад поперечного армирования ' + str(round(result['ksw']*100,1)) + '% от максимального.'
                 st.write(string)
             if result['sw_mode'] == 'проверка':
-                string = 'При заданном $A_{sw} = ' + str(result['Asw']) + '\\cdot см^2$ и шаге $s_w = ' + str(result['sw']) + '\\cdot см$ '
-                string += 'усилие в поперечной арматуре $q_{sw} = ' + str(result['qsw']) + '\\cdot тс/см$.'
+                string = 'При заданном $A_{sw} = ' + str(result['Asw']) + ' см^2$ и шаге $s_w = ' + str(result['sw']) + ' см$ '
+                string += 'усилие в поперечной арматуре $q_{sw} = ' + str(result['qsw']) + ' тс/см$.'
                 if result['ksw']>1:
                     string += ':orange['
                 string += ' Вклад поперечного армирования ' + str(round(result['ksw']*100,1)) + '% от максимального.'
@@ -61,8 +61,8 @@ def fast_report (result, result_second): #Быстрый отчет
             if result['sw_mode'] == 'проверка' or (result['sw_mode'] == 'подбор' and result['kb']>1):
                 st.write('Предельные усилия, воспринимаемые арматурой:')
                 string = '$F_{sw,ult} = ' + str(result["Fswult"]) +  '\\cdot тс; '
-                string += '\\quad M_{sw,x,ult} = ' + str(result["Mswxult"])+  '\\cdot тсм; '
-                string += '\\quad M_{sw,y,ult} = ' + str(result["Mswyult"])+  '\\cdot тсм.$'
+                string += '\\quad M_{sw,x,ult} = ' + str(result["Mswxult"])+  ' тсм; '
+                string += '\\quad M_{sw,y,ult} = ' + str(result["Mswyult"])+  ' тсм.$'
                 st.write(string)
                 if result['Fsw_code'] == 1:
                     string = ':blue[Вклад поперечного армирования ограничен несущей способностью бетона]'
@@ -84,10 +84,10 @@ def fast_report (result, result_second): #Быстрый отчет
             string += ' Предельные усилия, воспринимаемые бетоном:'
             st.write(string)
             string = '$F_{b,ult} = ' + str(result_second["Fbult"]) +  '\\cdot тс; '
-            string += '\\quad M_{bx,ult} = ' + str(result_second["Mbxult"])+  '\\cdot тсм; '
-            string += '\\quad M_{by,ult} = ' + str(result_second["Mbyult"])+  '\\cdot тсм.$'
+            string += '\\quad M_{bx,ult} = ' + str(result_second["Mbxult"])+  ' тсм; '
+            string += '\\quad M_{by,ult} = ' + str(result_second["Mbyult"])+  ' тсм.$'
             st.write(string)
-            string = ' Коэффициенты для расчетного контура на расстоянии $' + str(result_second['kh0']) + '\\cdot h_0=' + str(round(result_second['h0']*result_second['kh0'],1)) +  '\\cdot см$:'
+            string = ' Коэффициенты для расчетного контура на расстоянии $' + str(result_second['kh0']) + '\\cdot h_0=' + str(round(result_second['h0']*result_second['kh0'],1)) +  ' см$:'
             st.write(string)
             string = '$k_{b,F}='  + str(result_second['kbF'])
             string += '; \\quad k_{b,M}='  + str(result_second['kbM'])
@@ -95,7 +95,7 @@ def fast_report (result, result_second): #Быстрый отчет
             if result_second['kbM0'] != result_second['kbM']:
                 string += ' :blue[Вклад моментов ограничен.]'
             if result['Fq'] != 0.0:
-                string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(result_second['q']) + '\\cdot' + str(result_second['Aq']) + '=' + str(result_second['Fq']) + '\\cdot тс$.]'
+                string += ' :blue[Учтена разгружающая сила $F_q = q \\cdot A_q = ' + str(result_second['q']) + '\\cdot' + str(result_second['Aq']) + '=' + str(result_second['Fq']) + ' тс$.]'
             st.write(string)
             if result_second['kb'] <= 1:
                 string = ':green[Прочность за зоной поперечного армирования обеспечена.]'
@@ -136,28 +136,28 @@ def init_data_help(): #Пояснения к параметрам
         st.write('''Параметр "$\\delta_{M}$ для $F \\cdot e$". Данный параметр указывает, учитывать ли понижающие коэффициенты $\\delta_{M}$ для моментов от эксцентриситета.
         В соответствии с п. 8.1.46 указания по снижению момента представлены только в абзаце, содержащем $M_{loc}$.''')
 
-def report_init_data(result, doc, fig_Aq=None): #Печать исходных данных
+def report_init_data(result, doc): #Печать исходных данных
     with st.expander('Исходные данные'):
         string = 'Исходные данные.'
         doc.add_heading(string, level=2)
         st.subheader(string)
 
         string = 'Геометрия.'
-        doc.add_heading(string, level=3)
+        #doc.add_heading(string, level=3)
         st.subheader(string)
 
-        string = 'Ширина колонны $b=' + str(result['b']) + '\\cdot см$.'
+        string = 'Ширина колонны $b=' + str(result['b']) + ' см$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
-        string = 'Высота колонны $h=' + str(result['h']) + '\\cdot см$.'
+        string = 'Высота колонны $h=' + str(result['h']) + ' см$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
-        string = 'Приведенная рабочая высота сечения плиты $h_0=' + str(result['h0']) + '\\cdot см$.'
+        string = 'Приведенная рабочая высота сечения плиты $h_0=' + str(result['h0']) + ' см$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
         string = 'Приложенные усилия.'
-        doc.add_heading(string, level=3)
+        #doc.add_heading(string, level=3)
         st.subheader(string)
 
         if result['F_dir'] == 'вверх':
@@ -173,15 +173,15 @@ def report_init_data(result, doc, fig_Aq=None): #Печать исходных �
         p00.style = 'Рис. 3'
         p00.add_run('Положительные направления действующих усилий')
 
-        string = 'Сосредоточенная сила $F=' + str(result['F0']) + '\\cdot тс$, направленная ' + result['F_dir'] + '.'
+        string = 'Сосредоточенная сила $F=' + str(result['F0']) + ' тс$, направленная ' + result['F_dir'] + '.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
         if round(abs(result['q']), 1) != 0.0:
-            string = 'Распределенные силы $q=' + str(result['q']) +  ' \\cdot тс/м^2$, действующие в пределах основания пирамиды продавливания в противоположном для $F$ направлении.'
+            string = 'Распределенные силы $q=' + str(result['q']) +  ' тс/м^2$, действующие в пределах основания пирамиды продавливания в противоположном для $F$ направлении.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
-        string = 'Изгибающий момент в плоскости оси $x$ в месте приложения силы $M_{x,loc}=' + str(result['Mxloc']) + '\\cdot тсм$.'
+        string = 'Изгибающий момент в плоскости оси $x$ в месте приложения силы $M_{x,loc}=' + str(result['Mxloc']) + ' тсм$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         string = 'Понижающий коэффициент для'
@@ -192,7 +192,7 @@ def report_init_data(result, doc, fig_Aq=None): #Печать исходных �
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
-        string = 'Изгибающий момент в плоскости оси $y$ в месте приложения силы $M_{y,loc}=' + str(result['Myloc']) + '\\cdot тсм$.'
+        string = 'Изгибающий момент в плоскости оси $y$ в месте приложения силы $M_{y,loc}=' + str(result['Myloc']) + ' тсм$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         string = 'Понижающий коэффициент для'
@@ -205,17 +205,17 @@ def report_init_data(result, doc, fig_Aq=None): #Печать исходных �
 
 
         string = 'Материалы.'
-        doc.add_heading(string, level=3)
+        #doc.add_heading(string, level=3)
         st.subheader(string)
         string = 'Класс бетона по прочности на сжатие ' + result['ctype'] + ', '
-        string += '$R_{bt}=' + str(result['Rbt0']) + '\\cdot МПа$, '
+        string += '$R_{bt}=' + str(result['Rbt0']) + ' МПа$, '
         string += '$\\gamma_{bt}=' + str(result['gammabt']) + '$.'
         string += ' Расчетное сопротивление бетона на растяжение, учитываемое в расчете:'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         string =  '$R_{bt}=R_{bt} \\cdot \\gamma_{bt} = ' + str(result['Rbt0']) + '\\cdot' + str(result['gammabt'])
-        string += '=' + str(result['RbtMPA']) + '\\cdot МПа='
-        string += str(result['Rbt']) + '\\cdot тс/см^2'
+        string += '=' + str(result['RbtMPA']) + ' МПа='
+        string += str(result['Rbt']) + ' тс/см^2'
         string += '.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
@@ -225,15 +225,15 @@ def report_init_data(result, doc, fig_Aq=None): #Печать исходных �
             string += 'Расчетное сопротивление поперечной арматуры, учитываемое в расчете:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
-            string =  '$R_{sw}= ' + str(result['Rsw0']) +  '\\cdot МПа='
-            string += str(result['Rsw']) + '\\cdot тс/см^2'
+            string =  '$R_{sw}= ' + str(result['Rsw0']) +  ' МПа='
+            string += str(result['Rsw']) + ' тс/см^2'
             string += '.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = 'Поперечное армирование.'
-            doc.add_heading(string, level=3)
+            #doc.add_heading(string, level=3)
             st.subheader(string)
-            string = 'Диаметр стержней поперечного армирования ' + '$d_{sw}=' + str(result['dsw']) + '\\cdot мм$.'
+            string = 'Диаметр стержней поперечного армирования ' + '$d_{sw}=' + str(result['dsw']) + ' мм$.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = 'Число стержней в одном ряду, пересекающих пирамиду продавливания ' + '$n_{sw}='  + str(result['nsw']) + ' шт$.'
@@ -244,7 +244,7 @@ def report_init_data(result, doc, fig_Aq=None): #Печать исходных �
             add_text_latex(doc.add_paragraph(), string)
             string = '$A_{sw} = \\dfrac{\\pi \\cdot d_{sw}^2 \\cdot n_{sw}}{4} = '
             string += '\\dfrac{\\pi \\cdot ' + str(result['dsw']) + '^2 \\cdot' + str(result['nsw']) + '}{4 \\cdot 100} =' 
-            string += str(result['Asw']) + '\\cdot см^2.$'
+            string += str(result['Asw']) + ' см^2.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = 'Примечание. Деление на 100  для перевода $мм^2$ в $см^2$.'
@@ -252,14 +252,14 @@ def report_init_data(result, doc, fig_Aq=None): #Печать исходных �
             add_text_latex(doc.add_paragraph(), string)
 
             if str(result['sw_mode']) == 'проверка':
-                string = 'Шаг рядов поперечного армирования вдоль расчетного контура ' + '$s_{w}='  +  str(result['sw']) + '\\cdot см$.'
+                string = 'Шаг рядов поперечного армирования вдоль расчетного контура ' + '$s_{w}='  +  str(result['sw']) + ' см$.'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
                 string = 'Усилие в поперечной арматуре на единицу длины контура расчетного поперечного сечения:'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
                 string = '$q_{sw} = \\dfrac{R_{sw} \\cdot A_{sw} }{s_w} = \\dfrac{' + str(result['Rsw']) + '\\cdot' + str(result['Asw'])
-                string += '}' + '{' +  str(result['sw']) +  '}=' + str(result['qsw0']) + '\\cdot тс/см.$'
+                string += '}' + '{' +  str(result['sw']) +  '}=' + str(result['qsw0']) + ' тс/см.$'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
 
@@ -589,7 +589,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
         if True: #Длины участков
             string = 'Геометрические характеристики, такие как статические моменты, осевые моменты инерции, моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
             st.write(string)
-            doc.add_paragraph().add_run(string)
+            #doc.add_paragraph().add_run(string)
             string = 'Длины участков расчетного контура $L_i$, а также длины их проекций $L_{x,i}$ и $L_{y,i}$ в соответствии с эскизом приведены в таблице ниже.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
@@ -630,7 +630,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
             string = '$u = \\sum_i L_i = ' + str(result['L_arr'][0])
             for i in range(1, len(result['L_arr'])):
                 string += ' + ' + str(result['L_arr'][i])
-            string += ' = ' + str(result['u']) + '\\cdot см.$'
+            string += ' = ' + str(result['u']) + ' см.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
     
@@ -711,7 +711,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
                 if result['Sx0_arr'][i] > 0:
                     string += '+'
                 string += str(result['Sx0_arr'][i])
-            string += '=' + str(result['Sx0']) + ' \\cdot см^2.$'
+            string += '=' + str(result['Sx0']) + ' см^2.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -721,7 +721,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
                 if result['Sy0_arr'][i] > 0:
                     string += '+'
                 string += str(result['Sy0_arr'][i])
-            string += ' = ' + str(result['Sy0']) + '\\cdot см^2.$'
+            string += ' = ' + str(result['Sy0']) + ' см^2.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -731,13 +731,13 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
             doc.add_paragraph().add_run(string)
             string = '$ x_c = \\dfrac{S_{bx,0}}{u} = '
             string += '\\dfrac{' + str(result['Sx0']) + '}{' + str(result['u']) + '}='
-            string += str(result['xc']) + ' \\cdot см.$'
+            string += str(result['xc']) + ' см.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
             string = '$ y_c = \\dfrac{S_{by,0}}{u} = '
             string += '\\dfrac{' + str(result['Sy0']) + '}{' + str(result['u']) + '}='
-            string += str(result['yc']) + ' \\cdot см.$'
+            string += str(result['yc']) + ' см.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -751,7 +751,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
                     string = '$e_x = x_c - b/2= ' + str(result['xc']) + ' - ' +  str(round(result['b']/2,2))
-                    string += ' = ' + str(result["ex"]) + ' \\cdot см.$'
+                    string += ' = ' + str(result["ex"]) + ' см.$'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
                 if result["ey"] != 0:
@@ -759,7 +759,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
                     string = '$e_y = y_c - h/2= ' + str(result['yc']) + ' - ' +  str(round(result['h']/2,2))
-                    string += ' = ' + str(result["ey"]) + ' \\cdot см.$'
+                    string += ' = ' + str(result["ey"]) + ' см.$'
                     st.write(string)
                     add_text_latex(doc.add_paragraph(), string)
 
@@ -928,7 +928,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
                 if result['Ix_arr'][i] > 0:
                     string += '+'
                 string += str(result['Ix_arr'][i])
-            string += '=' + str(result['Ix']) + '\\cdot см^3;$'
+            string += '=' + str(result['Ix']) + ' см^3;$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -938,7 +938,7 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
                 if result['Iy_arr'][i] > 0:
                     string += '+'
                 string += str(result['Iy_arr'][i])
-            string += '=' + str(result['Iy']) + '\\cdot см^3.$'
+            string += '=' + str(result['Iy']) + ' см^3.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -949,14 +949,14 @@ def report_full_geometry(result, doc, fig, fig_Aq=None): #Полный расч�
             string = '$ W_{bx} = \\dfrac{I_{bx}}{x_{\\max}} = \\dfrac{'
             string += str(result['Ix']) +'}{'
             string += str(result['xmax']) + '} = ' + str(result['Wx'])
-            string += '\\cdot см^2;$'
+            string += ' см^2;$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
             string = '$ W_{by} = \\dfrac{I_{by}}{y_{\\max}} = \\dfrac{'
             string += str(result['Iy']) + '}{'
             string += str(result['ymax']) + '} = ' +str(result['Wy'])
-            string += '\\cdot см^2.$'
+            string += ' см^2.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -965,18 +965,19 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
         string = 'Геометрические характеристики контура.'
         st.subheader(string)
         doc.add_heading(string, level=2)
-
+        string = 'Геометрические характеристики, такие как осевые моменты инерции и моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
+        st.write(string)
         if fig_Aq:
             table = doc.add_table(1, 2)
             p0 = table.cell(0,0).paragraphs[0]
-            p0.add_run().add_picture(fig, height=Mm(40))
+            p0.add_run().add_picture(fig, height=Mm(90))
             p0.paragraph_format.first_line_indent = Mm(0)
             p0.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p00 = table.cell(0,0).add_paragraph()
             p00.style = 'Рис. 3'
             p00.add_run('Эскиз расчетного контура')
             p1 = table.cell(0,1).paragraphs[0]
-            p1.add_run().add_picture(fig_Aq, height=Mm(40))
+            p1.add_run().add_picture(fig_Aq, height=Mm(45))
             p1.paragraph_format.first_line_indent = Mm(0)
             p1.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p10 = table.cell(0,1).add_paragraph()
@@ -992,13 +993,13 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
             p.add_run('Эскиз расчетного контура')
 
         if True: #Периметр расчетного контура
-            string = 'Геометрические характеристики, такие как осевые моменты инерции и моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
-            st.write(string)
-            add_text_latex(doc.add_paragraph(), string)
+            #string = 'Геометрические характеристики, такие как осевые моменты инерции и моменты сопротивления для расчетного контура вычисляются в НАПРАВЛЕНИИ соответствующих осей.'
+            #st.write(string)
+            #add_text_latex(doc.add_paragraph(), string)
             string = 'Периметр расчетного контура:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
-            string = '$u = ' + str(result['u']) + '\\cdot см.$'
+            string = '$u = ' + str(result['u']) + ' см.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1006,7 +1007,7 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
             string = 'Координаты центра тяжести контура относительно левого нижнего угла колонны:'
             st.write(string)
             doc.add_paragraph().add_run(string)
-            string = '$ x_c = ' + str(result['yc']) + ' \\cdot см; \\quad  y_c = ' + str(result['yc']) + ' \\cdot см.$'
+            string = '$ x_c = ' + str(result['xc']) + ' см; \\quad  y_c = ' + str(result['yc']) + ' см.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
         
@@ -1017,11 +1018,11 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
                 add_text_latex(doc.add_paragraph(), string)
                 string = '$'
                 if result["ex"] !=0:
-                    string += 'e_x = ' + str(result["ex"]) +  '\\cdot см'
+                    string += 'e_x = ' + str(result["ex"]) +  ' см'
                 if result["ey"] !=0:
                     if result["ex"] !=0:
                         string += '; \\quad '
-                    string += 'e_y = ' + str(result["ey"]) +  ' \\cdot см'
+                    string += 'e_y = ' + str(result["ey"]) +  ' см'
                 string += '.$'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
@@ -1039,8 +1040,8 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
             string = 'Моменты инерции расчетного контура:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
-            string = '$ I_{bx} = ' + str(result["Ix"]) + '\\cdot см^3; \\quad '
-            string += ' I_{by} = '  + str(result["Iy"]) + '\\cdot см^3.$'
+            string = '$ I_{bx} = ' + str(result["Ix"]) + ' см^3; \\quad '
+            string += ' I_{by} = '  + str(result["Iy"]) + ' см^3.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1048,8 +1049,8 @@ def report_short_geometry(result, doc, fig, fig_Aq=None): #Краткий рас
             string = 'Моменты сопротивления расчетного контура:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
-            string = '$ W_{bx} = ' + str(result["Wx"]) + '\\cdot см^2; \\quad'
-            string += ' W_{by} = ' + str(result["Wy"]) + '\\cdot см^2.$'
+            string = '$ W_{bx} = ' + str(result["Wx"]) + ' см^2; \\quad'
+            string += ' W_{by} = ' + str(result["Wy"]) + ' см^2.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1059,18 +1060,18 @@ def report_concrete_ultimate_forces(result, doc): #Расчет предельн
             string = 'Предельные усилия, воспринимаемые бетоном.'
             st.subheader(string)
             doc.add_heading(string, level=2)
-            string = 'Предельную продавливающую силу, воспринимаемую бетоном $F_{b,ult}$, вычисляем по формуле (8.88) с учетом формулы (8.89):'
+            string = 'Предельная сила, воспринимаемая бетоном $F_{b,ult}$, вычисляется по формуле (8.88) с учетом формулы (8.89):'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$F_{b,ult} = R_{bt} \\cdot h_0 \\cdot u = '
-            string += str(result['Rbt']) + ' \\cdot ' +  str(result['h0']) + ' \\cdot ' + str(result['u']) + ' = ' + str(result['Fbult']) + '\\cdot тс.$'
+            string += str(result['Rbt']) + ' \\cdot ' +  str(result['h0']) + ' \\cdot ' + str(result['u']) + ' = ' + str(result['Fbult']) + ' тс.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
-            string = 'Предельно допустимое значение продавливающей силы (с учетом положений п. 8.1.46), при которой допускается не учитывать изгибающие моменты:'
+            string = 'Предельно допустимое значение силы (с учетом положений п. 8.1.46), при которой допускается не учитывать изгибающие моменты:'
             st.write(string)
             doc.add_paragraph().add_run(string)
-            string = '$F_{b,ult}/1.5 = ' + str(result['Fbult']) + '/1.5 = ' +  str(round(result['Fbult']/1.5, 1)) + '\\cdot тс.$'
+            string = '$F_{b,ult}/1.5 = ' + str(result['Fbult']) + '/1.5 = ' +  str(round(result['Fbult']/1.5, 1)) + ' тс.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1079,12 +1080,12 @@ def report_concrete_ultimate_forces(result, doc): #Расчет предельн
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$ M_{bx,ult} = R_{bt} \\cdot h_0 \\cdot W_{bx} = '
-            string += str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot ' + str(result['Wx']) + '/100 = ' + str(result['Mbxult']) + ' \\cdot тсм;$'
+            string += str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot ' + str(result['Wx']) + '/100 = ' + str(result['Mbxult']) + ' тсм;$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
             string = '$ M_{by,ult} = R_{bt} \\cdot h_0 \\cdot W_{by} = '
-            string += str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot ' + str(result['Wy']) + '/100 = ' + str(result['Mbyult']) + ' \\cdot тсм.$'
+            string += str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot ' + str(result['Wy']) + '/100 = ' + str(result['Mbyult']) + ' тсм.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1097,14 +1098,14 @@ def report_acting_forces(result, doc): #Расчетные усилия
         string = 'Усилия, учитываемые в расчете.'
         st.subheader(string)
         doc.add_heading(string, level=2)
-        string = 'Сосредоточенная сила, направленная ' + str(result['F_dir']) + ' $F=' + str(result['F0']) + '\\cdot тс$.'
+        string = 'Сосредоточенная сила, направленная ' + str(result['F_dir']) + ' $F=' + str(result['F0']) + ' тс$.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         if round(abs(result['Fq']), 1) != 0.0:
-            string = 'Разгружающая сила $F_q = q \\cdot A_q = ' + str(result['q']) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + '\\cdot тс$.'
+            string = 'Разгружающая сила $F_q = q \\cdot A_q = ' + str(result['q']) + '\\cdot' + str(result['Aq']) + '=' + str(result['Fq']) + ' тс$.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
-            string = 'В расчете принимаем $F = F - F_q = ' + str(result['F0']) + '-' + str(result['Fq']) + '=' + str(result['F']) + '\\cdot тс$.'
+            string = 'В расчете принимаем $F = F - F_q = ' + str(result['F0']) + '-' + str(result['Fq']) + '=' + str(result['F']) + ' тс$.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1135,7 +1136,7 @@ def report_acting_forces(result, doc): #Расчетные усилия
                     if result['ex'] <0: string += '(' +  str(result['ex'])  + ')'
                     else: string += str(result['ex'])
                     string +=  '/100| '  ' =  ' + str(result['Mx']) 
-            string +=  '\\cdot тсм.$'
+            string +=  ' тсм.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1162,22 +1163,22 @@ def report_acting_forces(result, doc): #Расчетные усилия
                     if result['ey'] <0: string += '(' +  str(result['ey'])  + ')'
                     else: string += str(result['ey'])
                     string +=  '/100| '  ' =  ' + str(result['My']) 
-            string +=  '\\cdot тсм.$'
+            string +=  ' тсм.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
     
         if result["ex"] !=0 or result["ey"] !=0:
-            string = 'Примечание: деление на 100 для перевода сантиметров в метры.'
+            string = 'Примечание: деление на 100 для перевода см в м.'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
         if result["ex"] == 0:
-            string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} = | ' + str(result['Mxloc']) +'| \\cdot ' + str(result['deltaMx']) + '=' + str(result['Mx']) +  '\\cdot тсм.$'
+            string = '$M_x = |M_{x,loc}| \\cdot \\delta_{Mx} = | ' + str(result['Mxloc']) +'| \\cdot ' + str(result['deltaMx']) + '=' + str(result['Mx']) +  ' тсм.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
         if result["ey"] == 0:
-            string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} = | ' + str(result['Myloc']) +'| \\cdot ' + str(result['deltaMy']) + '=' + str(result['My']) +  '\\cdot тсм.$'
+            string = '$M_y = |M_{y,loc}| \\cdot \\delta_{My} = | ' + str(result['Myloc']) +'| \\cdot ' + str(result['deltaMy']) + '=' + str(result['My']) +  ' тсм.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
 
@@ -1195,7 +1196,7 @@ def report_concrete_strength (result, doc): #Прочность по бетон�
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
         if True: #Проверка по моментам
-            string = 'Коэффициент использования прочности бетона расчетного поперечного сечения по моментам:'
+            string = 'Коэффициент использования прочности бетона по моментам:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$k_{b,M}=\\dfrac{M_x}{M_{bx,ult}} + \\dfrac{M_y}{M_{by,ult}} =\\dfrac{'
@@ -1213,7 +1214,7 @@ def report_concrete_strength (result, doc): #Прочность по бетон�
                 add_text_latex(doc.add_paragraph(), string)
 
         if True: #Суммарно
-            string = 'Суммарный (по силе и моментам) коэффициент использования прочности бетона расчетного поперечного сечения:'
+            string = 'Суммарный коэффициент использования прочности бетона:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$k_b = k_{b,F} + k_{b,M}=' + str(result['kbF']) + ' + ' + str(result['kbM']) + ' = ' + str(result['kb']) + ' .$'
@@ -1244,7 +1245,7 @@ def report_reinf_ultimate_forces(result, doc): #Расчет предельны�
         add_text_latex(doc.add_paragraph(), string)
         string = '$F_{sw,ult} = 0.8 \\cdot q_{sw} \\cdot u = '
         string += '0.8 \\cdot' + str(result['qsw']) + '\\cdot' + str(result['u']) + '='
-        string += str(result['Fswult0']) + '\\cdot тс.$'
+        string += str(result['Fswult0']) + ' тс.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         if result['Fsw_code'] == 2: #Если поперечную арматуру нельзя учитывать в расчете
@@ -1258,7 +1259,7 @@ def report_reinf_ultimate_forces(result, doc): #Расчет предельны�
             string += ' Поперечная арматура учитывается в расчете. '
         if result['Fsw_code'] == 1: #Если несущая способность по поперечной арматуре превышает несущую способность по бетону
             string += 'Условие $F_{sw,ult} \\le F_{b,ult}$ не выполняется, вклад поперечного армирования ограничиваем. В расчете принимаем: '
-            string += '$F_{sw,ult} = F_{b,ult}=' + str(result['Fswult']) +  '\\cdot тс.$'
+            string += '$F_{sw,ult} = F_{b,ult}=' + str(result['Fswult']) +  ' тс.$'
         if result['Fsw_code'] == 0: #Если несущая способность по поперечной арматуре не превышает несущую способность по бетону
             string += 'Условие $F_{sw,ult} \\le F_{b,ult}$ выполняется, вклад поперечного армирования не ограничиваем.'
         st.write(string)
@@ -1276,12 +1277,12 @@ def report_reinf_ultimate_forces(result, doc): #Расчет предельны�
             add_text_latex(doc.add_paragraph(), string)
             string = '$M_{sw,x,ult}= 0.8 \\cdot q_{sw} \\cdot W_{bx} = '
             string += '0.8 \\cdot' + str(result['qsw']) + '\\cdot' + str(result['Wx']) + '/100='
-            string += str(result['Mswxult0']) + '\\cdot тсм;$'
+            string += str(result['Mswxult0']) + ' тсм;$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$ M_{sw,y,ult}= 0.8 \\cdot q_{sw} \\cdot W_{by} = '
             string += '0.8 \\cdot' + str(result['qsw']) + '\\cdot' + str(result['Wy']) + '/100='
-            string += str(result['Mswyult0']) + '\\cdot тсм.$'
+            string += str(result['Mswyult0']) + ' тсм.$'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = 'Примечание: деление на 100 для перевода см в м.'
@@ -1293,9 +1294,9 @@ def report_reinf_ultimate_forces(result, doc): #Расчет предельны�
                 string = 'Условя $M_{sw,x,ult} \\ge M_{bx,ult}$ и $M_{sw,y,ult} \\ge M_{by,ult}$ не выполняются, вклад поперечного армирования ограничиваем. В расчете принимаем:'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
-                string = '$M_{sw,x,ult} = M_{bx,ult}=' + str(result['Mswxult']) +  '\\cdot тсм; \\quad'
+                string = '$M_{sw,x,ult} = M_{bx,ult}=' + str(result['Mswxult']) +  ' тсм; \\quad'
                 string += ' M_{sw,y,ult} = M_{by,ult}=' + str(result['Mswyult'])
-                string += '\\cdot тсм.$'
+                string += ' тсм.$'
                 st.write(string)
                 add_text_latex(doc.add_paragraph(), string)
 
@@ -1307,18 +1308,18 @@ def report_solve_sw_min(result, doc): #Определением минималь
         string = ''
         if result['kb_sw_code'] == 1:
             string += 'Для обеспечения требований $F_{sw,ult} \\ge 0.25 \\cdot F_{b,ult}$ при подборе максимального шага поперечного армирования принимаем $k_b = 1.25$.'
-        string += ' Максимально допустимый шаг поперечного армирования при заданном $A_{sw} = ' + str(result['Asw']) + ' \\cdot см^2$ из условия прочности составляет:'
+        string += ' Максимально допустимый шаг поперечного армирования при заданном $A_{sw} = ' + str(result['Asw']) + ' см^2$ из условия прочности составляет:'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         string = '$s_w \\le \\dfrac{0.8 \\cdot R_{sw} \\cdot A_{sw} }{R_{bt} \\cdot h_0 \\cdot (k_{b} - 1)} = '
         string += '\\dfrac{0.8 \\cdot ' + str(result['Rsw']) + ' \\cdot ' + str(result['Asw']) + ' }{' + str(result['Rbt']) + ' \\cdot ' + str(result['h0']) + ' \\cdot (' + str(result['kb']) + ' - 1)} = '
-        string += str(result['sw_min0']) +  ' \\cdot см.$'
+        string += str(result['sw_min0']) +  ' см.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         string = 'Согласно конструктивным требованиям, шаг поперечного армирования не должен превышать величин $d_x/4$ и $d_y/4$, где $d_x$ и $d_y$ – габариты расчетного контура.'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
-        string = '$d_x/4 = ' + str(result['dx']) + '/ 4 = ' + str(round(result['dx']/4,1))  +  ' \\cdot см ; \\quad d_y/4 = ' + str(result['dy']) + '/ 4 = ' + str(round(result['dy']/4,1))  + ' \\cdot см.$'
+        string = '$d_x/4 = ' + str(result['dx']) + '/ 4 = ' + str(round(result['dx']/4,1))  +  ' см ; \\quad d_y/4 = ' + str(result['dy']) + '/ 4 = ' + str(round(result['dy']/4,1))  + ' см.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
         string = ''
@@ -1328,7 +1329,7 @@ def report_solve_sw_min(result, doc): #Определением минималь
             string += 'Подобранный шаг удовлетворяет конструктивным требованиям. В расчете принимаем:'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
-        string = '$s_w = ' + str(result['sw']) + ' \\cdot см; q_{sw} = \dfrac{R_{sw} \\cdot A_{sw}}{s_w} = \\dfrac{' + str(result['Rsw']) + ' \\cdot ' + str(result['Asw']) + '}{' + str(result['sw']) + '} = ' + str(result['qsw']) + ' \\cdot тс/см.$'
+        string = '$s_w = ' + str(result['sw']) + ' см; q_{sw} = \dfrac{R_{sw} \\cdot A_{sw}}{s_w} = \\dfrac{' + str(result['Rsw']) + ' \\cdot ' + str(result['Asw']) + '}{' + str(result['sw']) + '} = ' + str(result['qsw']) + ' тс/см.$'
         st.write(string)
         add_text_latex(doc.add_paragraph(), string)
 
@@ -1365,7 +1366,7 @@ def report_full_strength (result, doc): #Прочность по c попере�
                 add_text_latex(doc.add_paragraph(), string)
 
         if True: #Суммарно
-            string = 'Суммарный (по силе и моментам) коэффициент использования прочности расчетного поперечного сечения:'
+            string = 'Суммарный коэффициент использования прочности расчетного поперечного сечения:'
             st.write(string)
             add_text_latex(doc.add_paragraph(), string)
             string = '$k=k_{F}+k_{M}=' + str(result['kF']) + '+' + str(result['kM']) + '=' + str(result['k']) + '.$'

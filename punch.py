@@ -44,10 +44,10 @@ st.header('Расчет на продавливание плиты')
 
 is_report = st.sidebar.toggle('Формировать отчет', value=False)
 
-is_init_help, is_geom_help = False, False
+is_init_help, is_geom_full = False, False
 if is_report: #Если включена генерация отчета
     is_init_help = st.sidebar.toggle('Расчетные предпосылки', value=False)
-    is_geom_help = st.sidebar.toggle('Геом. характеристики подробно', value=False)
+    is_geom_full = st.sidebar.toggle('Геом. характеристики подробно', value=False)
 
 #Вывод справки по исходным данным
 init_data_help()
@@ -201,7 +201,7 @@ if True:
                   'F0': F0, 'Mxloc': Mxloc, 'Myloc': Myloc, 'deltaMx': deltaMx, 'deltaMy': deltaMy,
                   'F_dir': F_dir, 'delta_M_exc': delta_M_exc, 'M_abs': M_abs, 'xF': round(b/2,2), 'yF': round(h/2,2), 'q': q,
                   'is_sw': is_sw, 'Rsw': Rsw, 'Rsw0': Rsw0, 'Asw': Asw, 'sw': sw, 'sw_mode': sw_mode, 'rtype': rtype, 'dsw': dsw, 'nsw': nsw, 'qsw0': qsw0,
-                  'is_geom_help': is_geom_help}
+                  'is_geom_full': is_geom_full}
     #Результаты расчета по первому контуру
     result = single_solve(**solve_data)
     #Число элементов в контуре
@@ -223,11 +223,29 @@ if result['Fq'] != 0.0:
 
 cols[0].plotly_chart(fig)
 
+#st.plotly_chart(fig_sw)
+
 if num_elements<2:
     st.subheader('В расчете должно быть минимум два участка!')
     st.stop()
 
+#st.write(result)
 #Быстрый вывод основных результатов
+string = 'По бетону '
+if result['kb']>2: string += ':red[$k_b = ' + str(result['kb']) + '$]'
+if result['kb']<=1: string += ':green[$k_b = ' + str(result['kb']) + '$]'
+if 1<result['kb']<=2: string += ':orange[$k_b = ' + str(result['kb']) + '$]'
+if result['is_sw']:
+    if result['sw_mode'] == 'проверка' or (result['sw_mode'] == 'подбор' and 2 >= result['kb'] > 1):
+        if result['k']>1  and result['kb'] > 2: string += ', суммарно :red[$k=' + str(result['k']) + '$]'
+        if result['k']<=1: string += ', суммарно :green[$k=' + str(result['k']) + '$]'
+        if result['k']>1 and result['kb']<=2: string += ', суммарно :orange[$k=' + str(result['k']) + '$]'
+        string += ', за поперечным армированием '
+        if result_second['kb']>1: string += ':red[$k=' + str(result_second['kb']) + '$]'
+        if result_second['kb']<1: string += ':green[$k=' + str(result_second['kb']) + '$]'
+string += '.'
+st.write(string)
+
 with st.expander('Краткий отчет'):
     fast_report (result, result_second)
 
@@ -247,14 +265,18 @@ if is_report:
     string = 'Расчет производится согласно СП 63.13330.2018 п. 8.1.46 – 8.1.52.'
     if is_sw: string += ' Поперечная арматура принимается равномерно расположенной по периметру расчетного контура.'
     doc.add_paragraph().add_run(string)
+    string = 'Геометрические характеристики, такие как осевые моменты инерции и моменты сопротивления для расчетного контура вычисляются в направлении соответствующих осей.'
+    string += ' Принятые в расчете единицы измерения: длина – $см$; сила – $тс$; напряжение – $тс/см^2$.'
+    #st.write(string)
+    add_text_latex(doc.add_paragraph(), string)
 
 
     if is_init_help: report_solve_method(result, doc) #Вывод справки по расчету при необходимости
-    report_init_data(result, doc, image_stream_Aq) #Вывод исходных данных
+    report_init_data(result, doc) #Вывод исходных данных
 
    
     #Расчет геометрических характеристик
-    if result['is_geom_help']: report_full_geometry(result, doc, image_stream, image_stream_Aq)
+    if result['is_geom_full']: report_full_geometry(result, doc, image_stream, image_stream_Aq)
     else: report_short_geometry(result, doc, image_stream, image_stream_Aq)
 
     #Расчет действующих усилий
@@ -273,7 +295,7 @@ if is_report:
         report_concrete_strength(result, doc)
 
     #Вывод блока подбора шага поперечного армирования при необходимости
-    if result['is_sw'] and result['sw_mode'] == 'подбор' and result['kb'] > 1:
+    if result['is_sw'] and result['sw_mode'] == 'подбор' and 2>= result['kb'] > 1:
         #Подбор шага поперечного армирования
         report_solve_sw_min(result, doc)
         #Расчет предельных усилий, воспринимаемых арматурой

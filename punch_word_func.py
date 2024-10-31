@@ -51,6 +51,7 @@ def divide_latex(string):
     return string_text, string_latex
 
 def add_text_latex (p, string):
+    string = string.replace('  ', ' ')
     if '$' in string:
         string_text, string_latex = divide_latex(string)
         for i in range(len(string_text)):
